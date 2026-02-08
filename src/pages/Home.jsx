@@ -1,5 +1,5 @@
-import React from "react";
-import { Link } from "react-router-dom";
+import React, { useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
   Building2,
@@ -17,6 +17,7 @@ import {
 
 export const HomePage = () => {
   const { isAuthenticated, user } = useAuth();
+  const navigate = useNavigate();
 
   const primaryCtaLink = isAuthenticated
     ? user?.role === "landlord"
@@ -29,6 +30,57 @@ export const HomePage = () => {
       ? "/landlord/add-house"
       : "/register"
     : "/register";
+
+  // ✅ Quick Search form state
+  const [qs, setQs] = useState({
+    location: "",
+    minRent: "",
+    maxRent: "",
+    type: "",
+    beds: "",
+    search: "",
+  });
+
+  const onChangeQS = (e) => {
+    const { name, value } = e.target;
+    setQs((prev) => ({ ...prev, [name]: value }));
+  };
+
+  // ✅ Submit -> redirect to browse properties with query params
+  const handleQuickSearch = (e) => {
+    e.preventDefault();
+
+    const params = new URLSearchParams();
+
+    // only set non-empty fields
+    if (qs.location.trim()) params.set("location", qs.location.trim());
+    if (qs.minRent) params.set("minRent", qs.minRent);
+    if (qs.maxRent) params.set("maxRent", qs.maxRent);
+    if (qs.type) params.set("type", qs.type);
+    if (qs.beds) params.set("beds", qs.beds);
+    if (qs.search.trim()) params.set("search", qs.search.trim());
+
+    navigate(`/tenant/houses?${params.toString()}`);
+  };
+
+  const locationLabel = useMemo(() => {
+    return qs.location?.trim() ? qs.location.trim() : "Anywhere";
+  }, [qs.location]);
+
+  const budgetLabel = useMemo(() => {
+    const min = qs.minRent ? `₹${Number(qs.minRent).toLocaleString("en-IN")}` : "Any";
+    const max = qs.maxRent ? `₹${Number(qs.maxRent).toLocaleString("en-IN")}` : "Any";
+    return `${min} – ${max}`;
+  }, [qs.minRent, qs.maxRent]);
+
+  const typeLabel = useMemo(() => {
+    if (!qs.type) return "Any";
+    // match your house types if you use apartment/room/house
+    if (qs.type === "apartment") return "Apartment";
+    if (qs.type === "room") return "Room";
+    if (qs.type === "house") return "House";
+    return qs.type;
+  }, [qs.type]);
 
   return (
     <div className="min-h-screen bg-white">
@@ -99,46 +151,124 @@ export const HomePage = () => {
               </div>
             </div>
 
-            {/* Right card */}
+            {/* Right card (REAL FORM ✅) */}
             <div className="lg:col-span-5">
-              <div className="rounded-3xl bg-white/10 border border-white/20 backdrop-blur-xl shadow-2xl shadow-black/25 p-6">
+              <form
+                onSubmit={handleQuickSearch}
+                className="rounded-3xl bg-white/10 border border-white/20 backdrop-blur-xl shadow-2xl shadow-black/25 p-6"
+              >
                 <div className="flex items-center justify-between">
                   <div className="text-white font-semibold text-lg">Quick Search</div>
                   <div className="text-white/70 text-sm flex items-center gap-1">
-                    <MapPin className="w-4 h-4" /> Anywhere
+                    <MapPin className="w-4 h-4" /> {locationLabel}
                   </div>
                 </div>
 
                 <div className="mt-4 space-y-3">
+                  {/* Location */}
                   <div className="rounded-2xl bg-white/10 border border-white/15 p-4">
-                    <div className="text-white/70 text-xs">Location</div>
-                    <div className="text-white font-medium">Agartala, IN</div>
+                    <label className="text-white/70 text-xs">Location</label>
+                    <input
+                      name="location"
+                      value={qs.location}
+                      onChange={onChangeQS}
+                      placeholder="e.g. Agartala"
+                      className="mt-2 w-full bg-transparent text-white placeholder:text-white/50 outline-none"
+                    />
                   </div>
 
+                  {/* Budget + Type */}
                   <div className="grid grid-cols-2 gap-3">
                     <div className="rounded-2xl bg-white/10 border border-white/15 p-4">
-                      <div className="text-white/70 text-xs">Budget</div>
-                      <div className="text-white font-medium">₹5k – ₹20k</div>
+                      <label className="text-white/70 text-xs">Min Rent</label>
+                      <input
+                        type="number"
+                        name="minRent"
+                        value={qs.minRent}
+                        onChange={onChangeQS}
+                        placeholder="5000"
+                        className="mt-2 w-full bg-transparent text-white placeholder:text-white/50 outline-none"
+                      />
                     </div>
+
                     <div className="rounded-2xl bg-white/10 border border-white/15 p-4">
-                      <div className="text-white/70 text-xs">Type</div>
-                      <div className="text-white font-medium">Room / Flat</div>
+                      <label className="text-white/70 text-xs">Max Rent</label>
+                      <input
+                        type="number"
+                        name="maxRent"
+                        value={qs.maxRent}
+                        onChange={onChangeQS}
+                        placeholder="20000"
+                        className="mt-2 w-full bg-transparent text-white placeholder:text-white/50 outline-none"
+                      />
+                    </div>
+
+                    <div className="rounded-2xl bg-white/10 border border-white/15 p-4 col-span-2">
+                      <label className="text-white/70 text-xs">Property Type</label>
+                      <select
+                        name="type"
+                        value={qs.type}
+                        onChange={onChangeQS}
+                        className="mt-2 w-full bg-transparent text-white outline-none"
+                      >
+                        <option className="text-gray-900" value="">
+                          Any
+                        </option>
+                        <option className="text-gray-900" value="room">
+                          Room
+                        </option>
+                        <option className="text-gray-900" value="apartment">
+                          Apartment
+                        </option>
+                        <option className="text-gray-900" value="house">
+                          House
+                        </option>
+                      </select>
+                      <div className="mt-2 text-xs text-white/60">
+                        Budget: <b>{budgetLabel}</b> • Type: <b>{typeLabel}</b>
+                      </div>
                     </div>
                   </div>
 
-                  <Link
-                    to="/tenant/houses"
+                  {/* Optional: beds + keyword */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-2xl bg-white/10 border border-white/15 p-4">
+                      <label className="text-white/70 text-xs">Beds (min)</label>
+                      <input
+                        type="number"
+                        name="beds"
+                        value={qs.beds}
+                        onChange={onChangeQS}
+                        placeholder="1"
+                        className="mt-2 w-full bg-transparent text-white placeholder:text-white/50 outline-none"
+                      />
+                    </div>
+
+                    <div className="rounded-2xl bg-white/10 border border-white/15 p-4">
+                      <label className="text-white/70 text-xs">Keyword</label>
+                      <input
+                        name="search"
+                        value={qs.search}
+                        onChange={onChangeQS}
+                        placeholder="wifi, balcony..."
+                        className="mt-2 w-full bg-transparent text-white placeholder:text-white/50 outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
                     className="mt-2 inline-flex w-full items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-white text-indigo-700 font-semibold hover:bg-white/95 transition"
                   >
                     <Search className="w-5 h-5" />
                     Search Listings
-                  </Link>
+                  </button>
 
                   <p className="text-xs text-white/60 text-center">
-                    Tip: Use filters to narrow down quickly.
+                    Tip: You can also use filters on the listings page.
                   </p>
                 </div>
-              </div>
+              </form>
             </div>
           </div>
 
