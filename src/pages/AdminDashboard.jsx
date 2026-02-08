@@ -14,6 +14,7 @@ import {
   Trash2,
   Home,
   LogOut,
+  CreditCard,
 } from "lucide-react";
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -155,6 +156,15 @@ export const AdminDashboard = () => {
                 <Home className="w-4 h-4" />
                 View All Houses
               </Link>
+
+              <Link
+  to="/admin/payments"
+  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/15 hover:bg-white/20 border border-white/20 transition"
+>
+  <CreditCard className="w-4 h-4" />
+  Payments
+</Link>
+
 
               <button
                 onClick={handleLogout}

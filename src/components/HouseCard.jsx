@@ -85,7 +85,7 @@ export const HouseCard = ({ house, showActions, onEdit, onDelete }) => {
         <div className="flex items-center justify-between pt-3 border-t">
           <div>
             <span className="text-2xl font-bold text-indigo-600">
-              ${Number(house?.rent || 0).toLocaleString()}
+              ₹{Number(house?.rent || 0).toLocaleString()}
             </span>
             <span className="text-gray-500 text-sm">/month</span>
           </div>

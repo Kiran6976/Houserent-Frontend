@@ -1,14 +1,27 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { HouseCard } from "../components/HouseCard";
-import { Plus, Home, Mail, MapPin, Loader2, Building, Wallet, CheckCircle2, AlertTriangle } from "lucide-react";
+import {
+  Plus,
+  Home,
+  Mail,
+  MapPin,
+  Loader2,
+  Building,
+  Wallet,
+  CheckCircle2,
+  AlertTriangle,
+  Save,
+  Pencil,
+  Users
+} from "lucide-react";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
 export const LandlordDashboard = () => {
-  const { user, token, logout, updateUser } = useAuth();
+  const { user, token, logout, updateUser } = useAuth(); // ✅ updateUser if available
   const { showToast } = useToast();
   const navigate = useNavigate();
 
@@ -17,8 +30,14 @@ export const LandlordDashboard = () => {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
-  // ✅ Razorpay payout setup
-  const [creatingAccount, setCreatingAccount] = useState(false);
+  // ✅ UPI form state (inside dashboard)
+  const [editingUpi, setEditingUpi] = useState(false);
+  const [upiInput, setUpiInput] = useState(user?.upiId || "");
+  const [savingUpi, setSavingUpi] = useState(false);
+
+  useEffect(() => {
+    setUpiInput(user?.upiId || "");
+  }, [user?.upiId]);
 
   const authHeaders = useMemo(
     () => ({
@@ -53,13 +72,8 @@ export const LandlordDashboard = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  const handleEdit = (houseId) => {
-    navigate(`/landlord/edit-house/${houseId}`);
-  };
-
-  const handleDelete = (houseId) => {
-    setDeleteConfirm(houseId);
-  };
+  const handleEdit = (houseId) => navigate(`/landlord/edit-house/${houseId}`);
+  const handleDelete = (houseId) => setDeleteConfirm(houseId);
 
   const confirmDelete = async () => {
     if (!deleteConfirm) return;
@@ -83,38 +97,73 @@ export const LandlordDashboard = () => {
     }
   };
 
-  // ✅ Create Razorpay linked account
-  const createLinkedAccount = async () => {
-    if (!token) return showToast("Please login again", "error");
-
-    // strongly recommend phone for linked account
-    if (!user?.phone) {
-      return showToast("Please add your phone number in profile first (required for payout setup)", "error");
+  // ✅ Save UPI from dashboard
+  const saveUpi = async () => {
+    if (!token) {
+      showToast("Please login again", "error");
+      return;
     }
 
-    setCreatingAccount(true);
+    const cleaned = String(upiInput || "").trim();
+    if (!cleaned) {
+      showToast("UPI ID is required", "error");
+      return;
+    }
+    if (!cleaned.includes("@")) {
+      showToast("Invalid UPI ID format (example: name@bank)", "error");
+      return;
+    }
+
+    setSavingUpi(true);
     try {
-      const res = await fetch(`${API_URL}/api/route/landlord/create-linked-account`, {
-        method: "POST",
+      const res = await fetch(`${API_URL}/api/landlord/upi`, {
+        method: "PUT",
         headers: authHeaders,
+        body: JSON.stringify({ upiId: cleaned }),
       });
 
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.message || "Failed to create payout account");
+      if (!res.ok) throw new Error(data?.message || "Failed to save UPI ID");
 
-      // ✅ Update local auth user instantly
-      updateUser?.({
-        ...user,
-        razorpayAccountId: data.razorpayAccountId || user?.razorpayAccountId,
-        razorpayAccountStatus: data.razorpayAccountStatus || "created",
-        razorpayRequirements: data.requirements || {},
-      });
+      // ✅ Update auth user immediately
+      const updated = data?.user || { ...(user || {}), upiId: data?.upiId || cleaned };
 
-      showToast("Payout account created ✅ Next: complete KYC (we'll add form next)", "success");
+      // 1) Update AuthContext if supported
+      if (typeof updateUser === "function") {
+        updateUser(updated);
+      }
+
+      // 2) Always update localStorage as fallback
+      try {
+        const currentUserRaw = localStorage.getItem("homerent_current_user");
+        const currentUser = currentUserRaw ? JSON.parse(currentUserRaw) : null;
+
+        const merged = {
+          ...(currentUser || {}),
+          ...(updated || {}),
+          upiId: updated?.upiId || data?.upiId || cleaned,
+        };
+
+        localStorage.setItem("homerent_current_user", JSON.stringify(merged));
+      } catch {
+        // ignore
+      }
+
+      showToast("UPI ID saved ✅", "success");
+      setEditingUpi(false);
+
+      // ✅ If context doesn't update, reload to reflect instantly
+      if (typeof updateUser !== "function") {
+        window.location.reload();
+      }
     } catch (err) {
-      showToast(err.message || "Failed to create payout account", "error");
+      const msg = String(err.message || "").toLowerCase();
+      showToast(err.message || "Failed to save UPI ID", "error");
+      if (msg.includes("unauthorized") || msg.includes("jwt") || msg.includes("token")) {
+        logout?.();
+      }
     } finally {
-      setCreatingAccount(false);
+      setSavingUpi(false);
     }
   };
 
@@ -127,29 +176,22 @@ export const LandlordDashboard = () => {
   }
 
   const totalRent = houses.reduce((sum, h) => sum + Number(h.rent || 0), 0);
+  const totalBooking = houses.reduce((sum, h) => sum + Number(h.bookingAmount || 0), 0);
 
-  const payoutStatus = user?.razorpayAccountStatus || "not_created";
-  const isActivated = payoutStatus === "activated";
+  const upiId = user?.upiId || "";
 
-  const statusPill = () => {
+  const upiStatusPill = () => {
     const base = "inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold";
-    if (payoutStatus === "activated") {
+    if (upiId) {
       return (
         <span className={`${base} bg-green-100 text-green-700`}>
-          <CheckCircle2 className="w-4 h-4" /> ACTIVATED
-        </span>
-      );
-    }
-    if (payoutStatus === "created" || payoutStatus === "pending") {
-      return (
-        <span className={`${base} bg-yellow-100 text-yellow-700`}>
-          <AlertTriangle className="w-4 h-4" /> PENDING KYC
+          <CheckCircle2 className="w-4 h-4" /> UPI SET
         </span>
       );
     }
     return (
-      <span className={`${base} bg-gray-100 text-gray-700`}>
-        <AlertTriangle className="w-4 h-4" /> NOT SETUP
+      <span className={`${base} bg-yellow-100 text-yellow-700`}>
+        <AlertTriangle className="w-4 h-4" /> UPI NOT SET
       </span>
     );
   };
@@ -177,19 +219,25 @@ export const LandlordDashboard = () => {
               </div>
             </div>
 
-            <div className="flex gap-4">
+            <div className="flex gap-4 flex-wrap">
               <div className="bg-white/20 rounded-xl p-4 text-center">
                 <div className="text-3xl font-bold">{houses.length}</div>
                 <div className="text-white/80 text-sm">Properties</div>
               </div>
+
               <div className="bg-white/20 rounded-xl p-4 text-center">
                 <div className="text-3xl font-bold">₹{totalRent.toLocaleString("en-IN")}</div>
-                <div className="text-white/80 text-sm">Monthly Revenue</div>
+                <div className="text-white/80 text-sm">Monthly Rent</div>
+              </div>
+
+              <div className="bg-white/20 rounded-xl p-4 text-center">
+                <div className="text-3xl font-bold">₹{totalBooking.toLocaleString("en-IN")}</div>
+                <div className="text-white/80 text-sm">Total Booking Fees</div>
               </div>
             </div>
           </div>
 
-          {/* ✅ PAYOUT SETUP SECTION */}
+          {/* ✅ UPI SETUP */}
           <div className="mt-6 bg-white/10 rounded-xl p-4">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
@@ -199,54 +247,67 @@ export const LandlordDashboard = () => {
               <div className="flex-1">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <div className="font-semibold">Payout Setup (Razorpay Route)</div>
+                    <div className="font-semibold">Payout Setup (UPI)</div>
                     <p className="text-white/80 text-sm mt-1">
-                      Tenants can pay booking amount only after your payout account is setup.
+                      Tenants will pay booking amount via UPI. Please set your UPI ID.
                     </p>
                   </div>
-                  {statusPill()}
+                  {upiStatusPill()}
                 </div>
 
                 <div className="mt-3">
-                  {user?.razorpayAccountId ? (
+                  {upiId && !editingUpi ? (
                     <div className="text-sm text-white/90">
-                      Linked Account ID: <span className="font-semibold">{user.razorpayAccountId}</span>
+                      Your UPI ID: <span className="font-semibold">{upiId}</span>
                     </div>
-                  ) : (
+                  ) : !upiId && !editingUpi ? (
                     <div className="text-sm text-yellow-100">
-                      ⚠️ Payout account not created yet. Create it to start receiving payments.
+                      ⚠️ UPI ID not set. Add it so tenants can pay booking amount.
                     </div>
-                  )}
+                  ) : null}
                 </div>
 
-                <div className="mt-4 flex flex-col sm:flex-row gap-2">
-                  <button
-                    onClick={createLinkedAccount}
-                    disabled={creatingAccount || !!user?.razorpayAccountId}
-                    className="px-5 py-2 rounded-lg bg-white text-indigo-700 font-semibold hover:bg-indigo-50 transition disabled:opacity-60"
-                  >
-                    {creatingAccount
-                      ? "Creating..."
-                      : user?.razorpayAccountId
-                      ? "Account Created"
-                      : "Create Payout Account"}
-                  </button>
+                {/* Inline form */}
+                {editingUpi && (
+                  <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                    <input
+                      value={upiInput}
+                      onChange={(e) => setUpiInput(e.target.value)}
+                      placeholder="example@bank"
+                      className="w-full sm:w-[320px] px-4 py-2 rounded-lg border border-white/30 bg-white/10 text-white placeholder-white/60 outline-none focus:ring-2 focus:ring-white/40"
+                    />
 
-                  {!isActivated && user?.razorpayAccountId && (
                     <button
-                      onClick={() =>
-                        showToast("Next step: we will add KYC + bank details form here", "info")
-                      }
-                      className="px-5 py-2 rounded-lg bg-white/20 text-white font-semibold hover:bg-white/30 transition"
+                      onClick={saveUpi}
+                      disabled={savingUpi}
+                      className="px-5 py-2 rounded-lg bg-white text-indigo-700 font-semibold hover:bg-indigo-50 transition inline-flex items-center justify-center gap-2 disabled:opacity-60"
                     >
-                      Complete KYC (Next)
+                      {savingUpi ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      {savingUpi ? "Saving..." : "Save UPI"}
                     </button>
-                  )}
-                </div>
 
-                {!isActivated && user?.razorpayRequirements && Object.keys(user.razorpayRequirements).length > 0 && (
-                  <div className="mt-3 text-xs text-white/80">
-                    Razorpay Requirements: {JSON.stringify(user.razorpayRequirements)}
+                    <button
+                      onClick={() => {
+                        setEditingUpi(false);
+                        setUpiInput(user?.upiId || "");
+                      }}
+                      disabled={savingUpi}
+                      className="px-5 py-2 rounded-lg bg-white/20 text-white font-semibold hover:bg-white/30 transition disabled:opacity-60"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+
+                {!editingUpi && (
+                  <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                    <button
+                      onClick={() => setEditingUpi(true)}
+                      className="px-5 py-2 rounded-lg bg-white text-indigo-700 font-semibold hover:bg-indigo-50 transition inline-flex items-center justify-center gap-2"
+                    >
+                      <Pencil className="w-4 h-4" />
+                      {upiId ? "Update UPI ID" : "Set UPI ID"}
+                    </button>
                   </div>
                 )}
               </div>
@@ -267,6 +328,14 @@ export const LandlordDashboard = () => {
             <Plus className="w-5 h-5" />
             Add New Property
           </Link>
+          <Link
+            to="/landlord/tenants"
+            className="inline-flex items-center gap-2 bg-white border border-gray-200 text-gray-800 px-6 py-3 rounded-xl font-medium hover:bg-gray-50 transition"
+          >
+            <Users className="w-5 h-5 text-indigo-600" />
+            Users / Tenants
+          </Link>
+
         </div>
 
         {/* Houses Grid */}
