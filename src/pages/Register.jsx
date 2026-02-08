@@ -17,7 +17,7 @@ import {
 const onlyDigits = (v) => v.replace(/\D/g, "").slice(0, 6);
 
 export const Register = () => {
-  const { register, verifyEmailOtp, resendOtp } = useAuth(); // ✅ you will add these in AuthContext
+  const { register, verifyEmailOtp, resendOtp } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
 
@@ -37,9 +37,9 @@ export const Register = () => {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
-  // ✅ Terms & Conditions opt-in
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
-  const [termsError, setTermsError] = useState("");
+  // ✅ Terms & Privacy opt-in
+  const [acceptedLegal, setAcceptedLegal] = useState(false);
+  const [legalError, setLegalError] = useState("");
 
   // OTP state
   const [otp, setOtp] = useState("");
@@ -81,15 +81,15 @@ export const Register = () => {
     if (formData.password !== formData.confirmPassword)
       newErrors.confirmPassword = "Passwords do not match";
 
-    // ✅ Terms check
-    if (!acceptedTerms) {
-      setTermsError("You must accept the Terms & Conditions to continue");
+    // ✅ Legal check
+    if (!acceptedLegal) {
+      setLegalError("You must accept the Terms & Conditions and Privacy Policy to continue");
     } else {
-      setTermsError("");
+      setLegalError("");
     }
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0 && acceptedTerms;
+    return Object.keys(newErrors).length === 0 && acceptedLegal;
   };
 
   const handleSubmit = async (e) => {
@@ -109,10 +109,9 @@ export const Register = () => {
       });
 
       if (result?.success) {
-        // ✅ Registration now sends OTP, so go to OTP step
         showToast("OTP sent to your email. Please verify.", "success");
         setStep("otp");
-        setCooldown(60); // 60s resend cooldown
+        setCooldown(60);
       } else {
         showToast(result?.message || "Registration failed", "error");
       }
@@ -141,8 +140,6 @@ export const Register = () => {
 
       if (result?.success) {
         showToast("Email verified successfully!", "success");
-        // If your backend returns token on verify, AuthContext can store it.
-        // Navigate to role-based dashboard or login
         if (result?.user?.role === "landlord") navigate("/landlord");
         else if (result?.user?.role === "admin") navigate("/admin");
         else navigate("/tenant");
@@ -309,7 +306,9 @@ export const Register = () => {
               <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
-                  onClick={() => setFormData((prev) => ({ ...prev, role: "tenant" }))}
+                  onClick={() =>
+                    setFormData((prev) => ({ ...prev, role: "tenant" }))
+                  }
                   className={`p-4 rounded-xl border-2 transition-all ${
                     formData.role === "tenant"
                       ? "border-indigo-500 bg-indigo-50 text-indigo-700"
@@ -499,19 +498,19 @@ export const Register = () => {
               )}
             </div>
 
-            {/* ✅ Terms & Conditions */}
+            {/* ✅ Terms + Privacy */}
             <div className="flex items-start gap-3">
               <input
-                id="terms"
+                id="legal"
                 type="checkbox"
-                checked={acceptedTerms}
+                checked={acceptedLegal}
                 onChange={(e) => {
-                  setAcceptedTerms(e.target.checked);
-                  if (e.target.checked) setTermsError("");
+                  setAcceptedLegal(e.target.checked);
+                  if (e.target.checked) setLegalError("");
                 }}
                 className="mt-1 w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
               />
-              <label htmlFor="terms" className="text-sm text-gray-700">
+              <label htmlFor="legal" className="text-sm text-gray-700">
                 I agree to the{" "}
                 <Link
                   to="/terms"
@@ -521,14 +520,23 @@ export const Register = () => {
                 >
                   Terms & Conditions
                 </Link>{" "}
+                and{" "}
+                <Link
+                  to="/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-indigo-600 font-medium hover:underline"
+                >
+                  Privacy Policy
+                </Link>{" "}
                 and acknowledge that I have read and understood them.
               </label>
             </div>
-            {termsError && <p className="text-sm text-red-500">{termsError}</p>}
+            {legalError && <p className="text-sm text-red-500">{legalError}</p>}
 
             <button
               type="submit"
-              disabled={loading || !acceptedTerms}
+              disabled={loading || !acceptedLegal}
               className="w-full py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loading ? (
@@ -551,19 +559,6 @@ export const Register = () => {
               Sign in
             </Link>
           </p>
-        </div>
-
-        {/* Demo Credentials */}
-        <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
-          <h3 className="font-medium text-blue-900 mb-2">Demo Credentials</h3>
-          <div className="text-sm text-blue-800 space-y-1">
-            <p>
-              <strong>Landlord:</strong> landlord@demo.com / password123
-            </p>
-            <p>
-              <strong>Tenant:</strong> tenant@demo.com / password123
-            </p>
-          </div>
         </div>
       </div>
     </div>

@@ -13,7 +13,8 @@ import { TenantHouses } from "./pages/TenantHouses";
 import { HouseDetails } from "./pages/HouseDetails";
 import { NotFound } from "./pages/NotFound";
 import { Terms } from "./pages/Terms";
-
+import { Privacy } from "./pages/Privacy";
+import { RefundPolicy } from "./pages/RefundPolicy";
 // Admin Pages
 import { AdminLogin } from "./pages/AdminLogin";
 import { AdminDashboard } from "./pages/AdminDashboard";
@@ -42,6 +43,8 @@ export function App() {
               <Route path="/tenant/houses" element={<TenantHouses />} />
               <Route path="/house/:id" element={<HouseDetails />} />
               <Route path="/terms" element={<Terms />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/refund-policy" element={<RefundPolicy />} />
 
 
               {/* Admin Routes */}

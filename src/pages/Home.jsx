@@ -369,46 +369,70 @@ export const HomePage = () => {
 
       {/* FOOTER */}
       <footer className="bg-gray-950 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="flex flex-col md:flex-row gap-8 md:items-center md:justify-between">
-            <div>
-              <div className="flex items-center gap-2 text-2xl font-bold">
-                <Building2 className="w-8 h-8" />
-                <span>HomeRent</span>
-              </div>
-              <p className="mt-2 text-white/70 max-w-md">
-                A modern rental platform designed for speed, trust, and simplicity.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-6 text-sm text-white/70">
-              <div className="space-y-2">
-                <div className="text-white font-semibold">Explore</div>
-                <Link className="block hover:text-white" to="/tenant/houses">
-                  Properties
-                </Link>
-                <Link className="block hover:text-white" to="/register">
-                  Register
-                </Link>
-              </div>
-              <div className="space-y-2">
-                <div className="text-white font-semibold">Account</div>
-                <Link className="block hover:text-white" to={primaryCtaLink}>
-                  Dashboard
-                </Link>
-                <span className="block text-white/50">Support: coming soon</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-10 pt-6 border-t border-white/10 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between text-white/60 text-sm">
-            <span>© {new Date().getFullYear()} HomeRent. All rights reserved.</span>
-            <span className="inline-flex items-center gap-2">
-              <HomeIcon className="w-4 h-4" /> Built with MERN
-            </span>
-          </div>
+  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div className="flex flex-col md:flex-row gap-10 md:items-center md:justify-between">
+      
+      {/* Brand */}
+      <div>
+        <div className="flex items-center gap-2 text-2xl font-bold">
+          <Building2 className="w-8 h-8" />
+          <span>HomeRent</span>
         </div>
-      </footer>
+        <p className="mt-2 text-white/70 max-w-md">
+          A modern rental platform designed for speed, trust, and simplicity.
+        </p>
+      </div>
+
+      {/* Footer Links */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-6 text-sm text-white/70">
+        
+        {/* Explore */}
+        <div className="space-y-2">
+          <div className="text-white font-semibold">Explore</div>
+          <Link className="block hover:text-white" to="/tenant/houses">
+            Properties
+          </Link>
+          <Link className="block hover:text-white" to="/register">
+            Register
+          </Link>
+        </div>
+
+        {/* Account */}
+        <div className="space-y-2">
+          <div className="text-white font-semibold">Account</div>
+          <Link className="block hover:text-white" to={primaryCtaLink}>
+            Dashboard
+          </Link>
+          <span className="block text-white/50">Support: coming soon</span>
+        </div>
+
+        {/* 🔐 Legal (Razorpay REQUIRED) */}
+        <div className="space-y-2">
+          <div className="text-white font-semibold">Legal</div>
+          <Link className="block hover:text-white" to="/terms">
+            Terms & Conditions
+          </Link>
+          <Link className="block hover:text-white" to="/privacy">
+            Privacy Policy
+          </Link>
+          <Link className="block hover:text-white" to="/refund-policy">
+            Refund & Cancellation
+          </Link>
+        </div>
+      </div>
+    </div>
+
+    {/* Bottom Bar */}
+    <div className="mt-10 pt-6 border-t border-white/10 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between text-white/60 text-sm">
+      <span>© {new Date().getFullYear()} HomeRent. All rights reserved.</span>
+      <span className="inline-flex items-center gap-2">
+        <HomeIcon className="w-4 h-4" />
+        Built with MERN
+      </span>
+    </div>
+  </div>
+</footer>
+
     </div>
   );
 };
