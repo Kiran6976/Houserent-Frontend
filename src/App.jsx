@@ -12,6 +12,7 @@ import { Login } from "./pages/Login";
 import { TenantHouses } from "./pages/TenantHouses";
 import { HouseDetails } from "./pages/HouseDetails";
 import { NotFound } from "./pages/NotFound";
+import { Terms } from "./pages/Terms";
 
 // Admin Pages
 import { AdminLogin } from "./pages/AdminLogin";
@@ -40,6 +41,8 @@ export function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/tenant/houses" element={<TenantHouses />} />
               <Route path="/house/:id" element={<HouseDetails />} />
+              <Route path="/terms" element={<Terms />} />
+
 
               {/* Admin Routes */}
               <Route path="/admin" element={<AdminLogin />} />

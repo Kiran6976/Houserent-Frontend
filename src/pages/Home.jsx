@@ -1,201 +1,334 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { Building2, Search, Key, Shield, Star, ArrowRight } from 'lucide-react';
+import React from "react";
+import { Link } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import {
+  Building2,
+  Search,
+  Key,
+  ShieldCheck,
+  Star,
+  ArrowRight,
+  MapPin,
+  Sparkles,
+  BadgeCheck,
+  Users,
+  Home as HomeIcon,
+} from "lucide-react";
 
 export const HomePage = () => {
   const { isAuthenticated, user } = useAuth();
 
+  const primaryCtaLink = isAuthenticated
+    ? user?.role === "landlord"
+      ? "/landlord/dashboard"
+      : "/tenant/houses"
+    : "/tenant/houses";
+
+  const secondaryCtaLink = isAuthenticated
+    ? user?.role === "landlord"
+      ? "/landlord/add-house"
+      : "/register"
+    : "/register";
+
   return (
-    <div className="min-h-screen">
-      {/* Hero Section */}
-      <section className="relative bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-700 text-white overflow-hidden">
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=1920')] opacity-10 bg-cover bg-center"></div>
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/90 via-purple-600/90 to-indigo-700/90"></div>
-        
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 md:py-32">
-          <div className="max-w-3xl">
-            <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
-              Find Your Perfect
-              <span className="block text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-orange-300">
-                Rental Home
-              </span>
-            </h1>
-            <p className="text-xl md:text-2xl text-white/80 mb-8">
-              Connect with trusted landlords and discover amazing properties. 
-              Your dream home is just a click away.
-            </p>
-            
-            <div className="flex flex-col sm:flex-row gap-4">
-              {isAuthenticated ? (
+    <div className="min-h-screen bg-white">
+      {/* HERO */}
+      <section className="relative overflow-hidden">
+        {/* Background */}
+        <div className="absolute inset-0">
+          <div className="absolute inset-0 bg-gradient-to-br from-indigo-700 via-purple-700 to-fuchsia-700" />
+          <div className="absolute inset-0 opacity-15 bg-[radial-gradient(circle_at_20%_20%,white,transparent_45%),radial-gradient(circle_at_80%_20%,white,transparent_45%),radial-gradient(circle_at_50%_80%,white,transparent_50%)]" />
+          <div className="absolute -top-20 -right-28 h-72 w-72 rounded-full bg-white/10 blur-2xl" />
+          <div className="absolute -bottom-28 -left-20 h-72 w-72 rounded-full bg-white/10 blur-2xl" />
+        </div>
+
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-14 md:pt-24 md:pb-20">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+            {/* Left */}
+            <div className="lg:col-span-7">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/15 border border-white/20 text-white/90 text-sm">
+                <Sparkles className="w-4 h-4" />
+                Smart & secure rental platform
+              </div>
+
+              <h1 className="mt-5 text-4xl md:text-6xl font-bold tracking-tight text-white leading-tight">
+                Find a rental you’ll
+                <span className="block text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 to-orange-200">
+                  actually love
+                </span>
+              </h1>
+
+              <p className="mt-5 text-lg md:text-xl text-white/85 max-w-2xl">
+                Discover verified listings, contact landlords instantly, and book with confidence. Faster decisions, fewer hassles.
+              </p>
+
+              {/* CTAs */}
+              <div className="mt-8 flex flex-col sm:flex-row gap-3">
                 <Link
-                  to={user?.role === 'landlord' ? '/landlord/dashboard' : '/tenant/houses'}
-                  className="inline-flex items-center gap-2 px-8 py-4 bg-white text-indigo-600 rounded-xl font-semibold hover:bg-gray-100 transition shadow-xl text-lg"
+                  to={primaryCtaLink}
+                  className="inline-flex items-center justify-center gap-2 px-7 py-4 bg-white text-indigo-700 rounded-2xl font-semibold hover:bg-white/95 transition shadow-xl shadow-black/20"
                 >
-                  Go to Dashboard
+                  <Search className="w-5 h-5" />
+                  {isAuthenticated ? "Go to Dashboard" : "Browse Properties"}
                   <ArrowRight className="w-5 h-5" />
                 </Link>
-              ) : (
-                <>
+
+                <Link
+                  to={secondaryCtaLink}
+                  className="inline-flex items-center justify-center gap-2 px-7 py-4 rounded-2xl font-semibold text-white border border-white/25 bg-white/10 hover:bg-white/15 transition backdrop-blur"
+                >
+                  <Key className="w-5 h-5" />
+                  {user?.role === "landlord" ? "List a Property" : "Create Account"}
+                </Link>
+              </div>
+
+              {/* Trust badges */}
+              <div className="mt-8 flex flex-wrap items-center gap-3 text-white/85">
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/10 border border-white/15">
+                  <BadgeCheck className="w-4 h-4" />
+                  Verified listings
+                </div>
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/10 border border-white/15">
+                  <ShieldCheck className="w-4 h-4" />
+                  Secure booking flow
+                </div>
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/10 border border-white/15">
+                  <Users className="w-4 h-4" />
+                  Built for tenants & landlords
+                </div>
+              </div>
+            </div>
+
+            {/* Right card */}
+            <div className="lg:col-span-5">
+              <div className="rounded-3xl bg-white/10 border border-white/20 backdrop-blur-xl shadow-2xl shadow-black/25 p-6">
+                <div className="flex items-center justify-between">
+                  <div className="text-white font-semibold text-lg">Quick Search</div>
+                  <div className="text-white/70 text-sm flex items-center gap-1">
+                    <MapPin className="w-4 h-4" /> Anywhere
+                  </div>
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  <div className="rounded-2xl bg-white/10 border border-white/15 p-4">
+                    <div className="text-white/70 text-xs">Location</div>
+                    <div className="text-white font-medium">Agartala, IN</div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-2xl bg-white/10 border border-white/15 p-4">
+                      <div className="text-white/70 text-xs">Budget</div>
+                      <div className="text-white font-medium">₹5k – ₹20k</div>
+                    </div>
+                    <div className="rounded-2xl bg-white/10 border border-white/15 p-4">
+                      <div className="text-white/70 text-xs">Type</div>
+                      <div className="text-white font-medium">Room / Flat</div>
+                    </div>
+                  </div>
+
                   <Link
                     to="/tenant/houses"
-                    className="inline-flex items-center gap-2 px-8 py-4 bg-white text-indigo-600 rounded-xl font-semibold hover:bg-gray-100 transition shadow-xl text-lg"
+                    className="mt-2 inline-flex w-full items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-white text-indigo-700 font-semibold hover:bg-white/95 transition"
                   >
                     <Search className="w-5 h-5" />
-                    Browse Properties
+                    Search Listings
                   </Link>
-                  <Link
-                    to="/register"
-                    className="inline-flex items-center gap-2 px-8 py-4 bg-white/20 backdrop-blur-sm text-white rounded-xl font-semibold hover:bg-white/30 transition text-lg"
-                  >
-                    <Key className="w-5 h-5" />
-                    List Your Property
-                  </Link>
-                </>
-              )}
+
+                  <p className="text-xs text-white/60 text-center">
+                    Tip: Use filters to narrow down quickly.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
+
+          {/* Stats strip */}
+          <div className="mt-12 md:mt-16 grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              { label: "Verified Listings", value: "100+" },
+              { label: "Fast Booking", value: "< 1 min" },
+              { label: "Direct Contact", value: "Instant" },
+              { label: "Trusted Users", value: "Growing" },
+            ].map((s) => (
+              <div
+                key={s.label}
+                className="rounded-2xl bg-white/10 border border-white/15 backdrop-blur px-5 py-4 text-white"
+              >
+                <div className="text-2xl font-bold">{s.value}</div>
+                <div className="text-white/75 text-sm">{s.label}</div>
+              </div>
+            ))}
+          </div>
         </div>
-        
-        {/* Wave Decoration */}
+
+        {/* Bottom curve */}
         <div className="absolute bottom-0 left-0 right-0">
           <svg viewBox="0 0 1440 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M0 120L60 110C120 100 240 80 360 70C480 60 600 60 720 65C840 70 960 80 1080 85C1200 90 1320 90 1380 90L1440 90V120H1380C1320 120 1200 120 1080 120C960 120 840 120 720 120C600 120 480 120 360 120C240 120 120 120 60 120H0Z" fill="white"/>
+            <path
+              d="M0 120L60 110C120 100 240 80 360 70C480 60 600 60 720 65C840 70 960 80 1080 85C1200 90 1320 90 1380 90L1440 90V120H0Z"
+              fill="white"
+            />
           </svg>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="py-20 bg-white">
+      {/* FEATURES */}
+      <section className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              Why Choose HomeRent?
-            </h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              We make finding and listing rental properties simple, secure, and hassle-free.
+          <div className="text-center mb-14">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900">Everything you need to rent smarter</h2>
+            <p className="mt-3 text-lg text-gray-600 max-w-2xl mx-auto">
+              Clean listings, verified owners, clear pricing, and a booking flow built for real usage.
             </p>
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="p-8 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl text-center group hover:shadow-xl transition">
-              <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition">
-                <Search className="w-8 h-8 text-white" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">Easy Search</h3>
-              <p className="text-gray-600">
-                Find properties that match your preferences with our powerful search and filter tools.
-              </p>
-            </div>
-            
-            <div className="p-8 bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl text-center group hover:shadow-xl transition">
-              <div className="w-16 h-16 bg-green-600 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition">
-                <Shield className="w-8 h-8 text-white" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">Verified Listings</h3>
-              <p className="text-gray-600">
-                All properties are verified to ensure you get accurate information and trusted landlords.
-              </p>
-            </div>
-            
-            <div className="p-8 bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl text-center group hover:shadow-xl transition">
-              <div className="w-16 h-16 bg-orange-500 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition">
-                <Star className="w-8 h-8 text-white" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">Premium Service</h3>
-              <p className="text-gray-600">
-                Get personalized support and assistance throughout your rental journey.
-              </p>
-            </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <FeatureCard
+              icon={<Search className="w-6 h-6" />}
+              title="Modern search & filters"
+              desc="Find the right place fast with filters for location, rent, beds, and property type."
+            />
+            <FeatureCard
+              icon={<ShieldCheck className="w-6 h-6" />}
+              title="Verified & secure flow"
+              desc="Better trust signals and a safer booking process so tenants and landlords both feel confident."
+            />
+            <FeatureCard
+              icon={<Star className="w-6 h-6" />}
+              title="Premium experience"
+              desc="Clean UI, smooth interactions, and dashboards that make it easy to manage everything."
+            />
           </div>
         </div>
       </section>
 
-      {/* CTA Section */}
+      {/* CTA */}
       <section className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* For Tenants */}
-            <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition">
-              <div className="text-5xl mb-6">🏠</div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">For Tenants</h3>
-              <p className="text-gray-600 mb-6">
-                Browse thousands of verified rental properties. Filter by location, price, 
-                amenities, and more to find your perfect home.
-              </p>
-              <ul className="space-y-3 mb-8">
-                <li className="flex items-center gap-2 text-gray-700">
-                  <span className="w-5 h-5 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-sm">✓</span>
-                  Verified property listings
-                </li>
-                <li className="flex items-center gap-2 text-gray-700">
-                  <span className="w-5 h-5 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-sm">✓</span>
-                  Direct landlord contact
-                </li>
-                <li className="flex items-center gap-2 text-gray-700">
-                  <span className="w-5 h-5 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-sm">✓</span>
-                  Advanced search filters
-                </li>
-              </ul>
-              <Link
-                to="/tenant/houses"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition"
-              >
-                Browse Properties
-                <ArrowRight className="w-5 h-5" />
-              </Link>
-            </div>
-            
-            {/* For Landlords */}
-            <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition">
-              <div className="text-5xl mb-6">🔑</div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">For Landlords</h3>
-              <p className="text-gray-600 mb-6">
-                List your properties and connect with potential tenants. Manage your 
-                listings easily from your personal dashboard.
-              </p>
-              <ul className="space-y-3 mb-8">
-                <li className="flex items-center gap-2 text-gray-700">
-                  <span className="w-5 h-5 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-sm">✓</span>
-                  Easy property management
-                </li>
-                <li className="flex items-center gap-2 text-gray-700">
-                  <span className="w-5 h-5 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-sm">✓</span>
-                  Reach thousands of tenants
-                </li>
-                <li className="flex items-center gap-2 text-gray-700">
-                  <span className="w-5 h-5 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-sm">✓</span>
-                  Free to list properties
-                </li>
-              </ul>
-              <Link
-                to="/register"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-xl font-medium hover:bg-purple-700 transition"
-              >
-                List Your Property
-                <ArrowRight className="w-5 h-5" />
-              </Link>
-            </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <CTABox
+              emoji="🏠"
+              title="For Tenants"
+              desc="Browse verified listings and book without confusion. Contact landlords directly and save time."
+              bullets={[
+                "Verified property listings",
+                "Direct landlord contact",
+                "Advanced search filters",
+              ]}
+              buttonText="Browse Properties"
+              buttonLink="/tenant/houses"
+              buttonClass="bg-indigo-600 hover:bg-indigo-700"
+            />
+
+            <CTABox
+              emoji="🔑"
+              title="For Landlords"
+              desc="List your property and manage everything from your dashboard—houses, tenants, and bookings."
+              bullets={[
+                "Easy property management",
+                "Reach more tenants",
+                "Free to list properties",
+              ]}
+              buttonText="List Your Property"
+              buttonLink="/register"
+              buttonClass="bg-purple-600 hover:bg-purple-700"
+            />
           </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-2 text-2xl font-bold">
-              <Building2 className="w-8 h-8" />
-              <span>HomeRent</span>
+      {/* FOOTER */}
+      <footer className="bg-gray-950 text-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="flex flex-col md:flex-row gap-8 md:items-center md:justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-2xl font-bold">
+                <Building2 className="w-8 h-8" />
+                <span>HomeRent</span>
+              </div>
+              <p className="mt-2 text-white/70 max-w-md">
+                A modern rental platform designed for speed, trust, and simplicity.
+              </p>
             </div>
-            <p className="text-gray-400 text-center md:text-right">
-              © {new Date().getFullYear()} HomeRent. All rights reserved.
-              <br />
-              <span className="text-sm">Your trusted partner in finding the perfect home.</span>
-            </p>
+
+            <div className="grid grid-cols-2 gap-6 text-sm text-white/70">
+              <div className="space-y-2">
+                <div className="text-white font-semibold">Explore</div>
+                <Link className="block hover:text-white" to="/tenant/houses">
+                  Properties
+                </Link>
+                <Link className="block hover:text-white" to="/register">
+                  Register
+                </Link>
+              </div>
+              <div className="space-y-2">
+                <div className="text-white font-semibold">Account</div>
+                <Link className="block hover:text-white" to={primaryCtaLink}>
+                  Dashboard
+                </Link>
+                <span className="block text-white/50">Support: coming soon</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-10 pt-6 border-t border-white/10 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between text-white/60 text-sm">
+            <span>© {new Date().getFullYear()} HomeRent. All rights reserved.</span>
+            <span className="inline-flex items-center gap-2">
+              <HomeIcon className="w-4 h-4" /> Built with MERN
+            </span>
           </div>
         </div>
       </footer>
     </div>
   );
 };
+
+function FeatureCard({ icon, title, desc }) {
+  return (
+    <div className="group rounded-3xl border border-gray-200 bg-white p-7 shadow-sm hover:shadow-xl transition">
+      <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-700 flex items-center justify-center group-hover:scale-105 transition">
+        {icon}
+      </div>
+      <h3 className="mt-5 text-xl font-semibold text-gray-900">{title}</h3>
+      <p className="mt-2 text-gray-600 leading-relaxed">{desc}</p>
+      <div className="mt-5 h-px bg-gray-100" />
+      <div className="mt-4 text-sm text-gray-500 inline-flex items-center gap-2">
+        <BadgeCheck className="w-4 h-4 text-green-600" />
+        Smooth UI + reliable flow
+      </div>
+    </div>
+  );
+}
+
+function CTABox({ emoji, title, desc, bullets, buttonText, buttonLink, buttonClass }) {
+  return (
+    <div className="rounded-3xl bg-white border border-gray-200 shadow-sm hover:shadow-xl transition overflow-hidden">
+      <div className="p-8">
+        <div className="text-5xl">{emoji}</div>
+        <h3 className="mt-4 text-2xl font-bold text-gray-900">{title}</h3>
+        <p className="mt-3 text-gray-600">{desc}</p>
+
+        <ul className="mt-6 space-y-3">
+          {bullets.map((b) => (
+            <li key={b} className="flex items-center gap-3 text-gray-700">
+              <span className="w-7 h-7 rounded-full bg-green-100 text-green-700 flex items-center justify-center">
+                ✓
+              </span>
+              {b}
+            </li>
+          ))}
+        </ul>
+
+        <Link
+          to={buttonLink}
+          className={`mt-8 inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl text-white font-semibold transition ${buttonClass}`}
+        >
+          {buttonText}
+          <ArrowRight className="w-5 h-5" />
+        </Link>
+      </div>
+
+      <div className="h-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-fuchsia-500" />
+    </div>
+  );
+}

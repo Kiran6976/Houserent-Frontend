@@ -37,6 +37,10 @@ export const Register = () => {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
+  // ✅ Terms & Conditions opt-in
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [termsError, setTermsError] = useState("");
+
   // OTP state
   const [otp, setOtp] = useState("");
   const [otpLoading, setOtpLoading] = useState(false);
@@ -77,8 +81,15 @@ export const Register = () => {
     if (formData.password !== formData.confirmPassword)
       newErrors.confirmPassword = "Passwords do not match";
 
+    // ✅ Terms check
+    if (!acceptedTerms) {
+      setTermsError("You must accept the Terms & Conditions to continue");
+    } else {
+      setTermsError("");
+    }
+
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return Object.keys(newErrors).length === 0 && acceptedTerms;
   };
 
   const handleSubmit = async (e) => {
@@ -312,7 +323,9 @@ export const Register = () => {
 
                 <button
                   type="button"
-                  onClick={() => setFormData((prev) => ({ ...prev, role: "landlord" }))}
+                  onClick={() =>
+                    setFormData((prev) => ({ ...prev, role: "landlord" }))
+                  }
                   className={`p-4 rounded-xl border-2 transition-all ${
                     formData.role === "landlord"
                       ? "border-indigo-500 bg-indigo-50 text-indigo-700"
@@ -486,9 +499,36 @@ export const Register = () => {
               )}
             </div>
 
+            {/* ✅ Terms & Conditions */}
+            <div className="flex items-start gap-3">
+              <input
+                id="terms"
+                type="checkbox"
+                checked={acceptedTerms}
+                onChange={(e) => {
+                  setAcceptedTerms(e.target.checked);
+                  if (e.target.checked) setTermsError("");
+                }}
+                className="mt-1 w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+              />
+              <label htmlFor="terms" className="text-sm text-gray-700">
+                I agree to the{" "}
+                <Link
+                  to="/terms"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-indigo-600 font-medium hover:underline"
+                >
+                  Terms & Conditions
+                </Link>{" "}
+                and acknowledge that I have read and understood them.
+              </label>
+            </div>
+            {termsError && <p className="text-sm text-red-500">{termsError}</p>}
+
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !acceptedTerms}
               className="w-full py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loading ? (
@@ -504,7 +544,10 @@ export const Register = () => {
 
           <p className="mt-6 text-center text-gray-600">
             Already have an account?{" "}
-            <Link to="/login" className="text-indigo-600 font-medium hover:text-indigo-700">
+            <Link
+              to="/login"
+              className="text-indigo-600 font-medium hover:text-indigo-700"
+            >
               Sign in
             </Link>
           </p>
