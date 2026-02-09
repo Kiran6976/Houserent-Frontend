@@ -16,6 +16,9 @@ import { Terms } from "./pages/Terms";
 import { Privacy } from "./pages/Privacy";
 import { RefundPolicy } from "./pages/RefundPolicy";
 import { MyRents } from "./pages/MyRents";
+import { MyVisits } from "./pages/MyVisits";
+import { VisitRequests } from "./pages/VisitRequests";
+
 // Admin Pages
 import { AdminLogin } from "./pages/AdminLogin";
 import { AdminDashboard } from "./pages/AdminDashboard";
@@ -129,6 +132,24 @@ export function App() {
                   </ProtectedRoute>
                 }
               />
+
+              <Route
+              path="/tenant/my-visits"
+              element={
+                <ProtectedRoute requiredRole="tenant">
+                  <MyVisits />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/landlord/visit-requests"
+              element={
+                <ProtectedRoute requiredRole="landlord" requireVerifiedLandlord>
+                  <VisitRequests />
+                </ProtectedRoute>
+              }
+            />
 
 
               {/* 404 */}

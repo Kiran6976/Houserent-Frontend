@@ -52,6 +52,14 @@ export const HouseDetails = () => {
   const [checkingStatus, setCheckingStatus] = useState(false);
   const pollRef = useRef(null);
 
+  // ✅ Visit scheduling modal
+  const [showVisitModal, setShowVisitModal] = useState(false);
+  const [visitLoading, setVisitLoading] = useState(false);
+  const [visitForm, setVisitForm] = useState({
+    scheduledAt: "",
+    note: "",
+  });
+
   const landlord = useMemo(() => {
     return house?.landlordId && typeof house.landlordId === "object" ? house.landlordId : null;
   }, [house]);
@@ -104,6 +112,75 @@ export const HouseDetails = () => {
     }
     setShowContactModal(true);
   };
+
+  // ✅ Open Schedule Visit
+  const openVisitModal = () => {
+    if (!user || !token) {
+      showToast("Please login to schedule a visit", "info");
+      navigate("/login");
+      return;
+    }
+    if (user?.role !== "tenant") {
+      showToast("Only tenants can schedule visits.", "info");
+      return;
+    }
+    setVisitForm({ scheduledAt: "", note: "" });
+    setShowVisitModal(true);
+  };
+
+  // ✅ Submit visit request (Option A)
+  // ✅ Submit visit request (send start/end/message)
+const submitVisitRequest = async (e) => {
+  e.preventDefault();
+
+  if (!visitForm.scheduledAt) {
+    showToast("Please select a date & time for the visit.", "error");
+    return;
+  }
+
+  const start = new Date(visitForm.scheduledAt);
+  if (Number.isNaN(start.getTime())) {
+    showToast("Invalid date/time. Please try again.", "error");
+    return;
+  }
+
+  // ✅ 30 minutes slot
+  const end = new Date(start.getTime() + 30 * 60 * 1000);
+
+  // ✅ must be future (at least 30 mins recommended)
+  if (start.getTime() < Date.now() + 5 * 60 * 1000) {
+    showToast("Please choose a time at least 5 minutes from now.", "error");
+    return;
+  }
+
+  setVisitLoading(true);
+  try {
+    const res = await fetch(`${API_URL}/api/visits`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        houseId: id,
+        start: start.toISOString(),
+        end: end.toISOString(),
+        message: visitForm.note?.trim() || "",
+      }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.message || "Failed to schedule visit");
+
+    showToast("Visit request sent ✅ Landlord will approve/reject.", "success");
+    setShowVisitModal(false);
+  } catch (err) {
+    showToast(err.message || "Failed to schedule visit", "error");
+  } finally {
+    setVisitLoading(false);
+  }
+};
+
 
   const copyText = async (text) => {
     try {
@@ -211,7 +288,7 @@ export const HouseDetails = () => {
     }
   };
 
-  // ✅ Cancel booking (for invisible/stuck booking)
+  // ✅ Cancel booking
   const cancelBooking = async () => {
     const bookingId = activeBooking?.bookingId || payData?.bookingId;
     if (!bookingId) {
@@ -234,13 +311,10 @@ export const HouseDetails = () => {
 
       showToast("Booking cancelled ✅ You can book again now.", "success");
 
-      // clear modal state
       setActiveBooking(null);
       setPayData(null);
       setBookingStatus("cancelled");
       stopPolling();
-
-      // close modal after short moment (optional)
       closeBookingModal();
     } catch (err) {
       showToast(err.message || "Failed to cancel booking", "error");
@@ -276,14 +350,12 @@ export const HouseDetails = () => {
 
       const data = await res.json().catch(() => ({}));
 
-      // ✅ Handle active booking case (backend should send bookingId)
       if (!res.ok) {
         if (res.status === 400 && data?.bookingId) {
           setActiveBooking({ bookingId: data.bookingId, message: data?.message || "Active booking exists." });
           showToast(data?.message || "Active booking exists. You can cancel it.", "info");
-          return; // keep modal open with cancel button
+          return;
         }
-
         throw new Error(data?.message || "Failed to create booking");
       }
 
@@ -352,13 +424,17 @@ export const HouseDetails = () => {
     if (status === "failed") return <span className={`${base} bg-red-100 text-red-700`}>FAILED</span>;
     if (status === "expired") return <span className={`${base} bg-gray-200 text-gray-700`}>EXPIRED</span>;
     if (status === "cancelled") return <span className={`${base} bg-gray-200 text-gray-800`}>CANCELLED</span>;
+    if (status === "checking") return <span className={`${base} bg-gray-100 text-gray-700`}>CHECKING...</span>;
     return <span className={`${base} bg-gray-100 text-gray-700`}>{String(status).toUpperCase()}</span>;
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition">
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition"
+        >
           <ArrowLeft className="w-5 h-5" />
           Back to Listings
         </button>
@@ -391,7 +467,9 @@ export const HouseDetails = () => {
                         <button
                           key={index}
                           onClick={() => setCurrentImageIndex(index)}
-                          className={`w-2.5 h-2.5 rounded-full transition ${index === currentImageIndex ? "bg-white" : "bg-white/50"}`}
+                          className={`w-2.5 h-2.5 rounded-full transition ${
+                            index === currentImageIndex ? "bg-white" : "bg-white/50"
+                          }`}
                         />
                       ))}
                     </div>
@@ -445,7 +523,9 @@ export const HouseDetails = () => {
                 </div>
 
                 <div className="text-right">
-                  <div className="text-3xl font-bold text-indigo-600">₹{Number(house.rent || 0).toLocaleString("en-IN")}</div>
+                  <div className="text-3xl font-bold text-indigo-600">
+                    ₹{Number(house.rent || 0).toLocaleString("en-IN")}
+                  </div>
                   <div className="text-gray-500">per month</div>
                 </div>
               </div>
@@ -470,7 +550,9 @@ export const HouseDetails = () => {
                 <div className="text-center">
                   <Calendar className="w-6 h-6 mx-auto text-indigo-600 mb-1" />
                   <div className="text-lg font-semibold">
-                    {house.availability ? new Date(house.availability).toLocaleDateString("en-IN", { month: "short", day: "numeric" }) : "-"}
+                    {house.availability
+                      ? new Date(house.availability).toLocaleDateString("en-IN", { month: "short", day: "numeric" })
+                      : "-"}
                   </div>
                   <div className="text-sm text-gray-500">Available</div>
                 </div>
@@ -511,7 +593,9 @@ export const HouseDetails = () => {
                     <span className="font-semibold">₹</span>
                     <span>Monthly Rent</span>
                   </div>
-                  <span className="font-semibold text-gray-900">₹{Number(house.rent || 0).toLocaleString("en-IN")}</span>
+                  <span className="font-semibold text-gray-900">
+                    ₹{Number(house.rent || 0).toLocaleString("en-IN")}
+                  </span>
                 </div>
 
                 <div className="flex items-center justify-between py-3 border-b">
@@ -519,7 +603,9 @@ export const HouseDetails = () => {
                     <Shield className="w-5 h-5" />
                     <span>Security Deposit</span>
                   </div>
-                  <span className="font-semibold text-gray-900">₹{Number(house.deposit || 0).toLocaleString("en-IN")}</span>
+                  <span className="font-semibold text-gray-900">
+                    ₹{Number(house.deposit || 0).toLocaleString("en-IN")}
+                  </span>
                 </div>
 
                 <div className="flex items-center justify-between py-3">
@@ -527,7 +613,9 @@ export const HouseDetails = () => {
                     <CreditCard className="w-5 h-5" />
                     <span>Booking Amount</span>
                   </div>
-                  <span className="font-semibold text-gray-900">{bookingAmount > 0 ? `₹${bookingAmount.toLocaleString("en-IN")}` : "Not set"}</span>
+                  <span className="font-semibold text-gray-900">
+                    {bookingAmount > 0 ? `₹${bookingAmount.toLocaleString("en-IN")}` : "Not set"}
+                  </span>
                 </div>
               </div>
 
@@ -535,14 +623,31 @@ export const HouseDetails = () => {
                 onClick={handleBookNow}
                 disabled={bookingAmount <= 0}
                 className={`mt-4 w-full py-3 rounded-xl font-medium transition flex items-center justify-center gap-2 ${
-                  bookingAmount > 0 ? "bg-emerald-600 text-white hover:bg-emerald-700" : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                  bookingAmount > 0
+                    ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                    : "bg-gray-200 text-gray-500 cursor-not-allowed"
                 }`}
               >
                 <CreditCard className="w-5 h-5" />
                 Book Now (Pay ₹ Booking)
               </button>
 
-              {bookingAmount <= 0 && <p className="mt-2 text-xs text-gray-500">Booking amount is not set by landlord for this property.</p>}
+              {bookingAmount <= 0 && (
+                <p className="mt-2 text-xs text-gray-500">Booking amount is not set by landlord for this property.</p>
+              )}
+
+              {/* ✅ Schedule Visit */}
+              <button
+                onClick={openVisitModal}
+                className="mt-3 w-full py-3 rounded-xl font-medium transition flex items-center justify-center gap-2 bg-indigo-600 text-white hover:bg-indigo-700"
+              >
+                <Calendar className="w-5 h-5" />
+                Schedule a Visit
+              </button>
+
+              <p className="mt-2 text-xs text-gray-500">
+                Request a visit time. Landlord will approve/reject your request.
+              </p>
             </div>
 
             {/* Landlord Card */}
@@ -602,13 +707,19 @@ export const HouseDetails = () => {
 
               <div className="space-y-2">
                 {landlord.email && (
-                  <a href={`mailto:${landlord.email}`} className="flex items-center gap-3 p-3 bg-white rounded-lg hover:bg-indigo-50 transition">
+                  <a
+                    href={`mailto:${landlord.email}`}
+                    className="flex items-center gap-3 p-3 bg-white rounded-lg hover:bg-indigo-50 transition"
+                  >
                     <Mail className="w-5 h-5 text-indigo-600" />
                     <span className="text-gray-700">{landlord.email}</span>
                   </a>
                 )}
                 {landlord.phone && (
-                  <a href={`tel:${landlord.phone}`} className="flex items-center gap-3 p-3 bg-white rounded-lg hover:bg-indigo-50 transition">
+                  <a
+                    href={`tel:${landlord.phone}`}
+                    className="flex items-center gap-3 p-3 bg-white rounded-lg hover:bg-indigo-50 transition"
+                  >
                     <Phone className="w-5 h-5 text-indigo-600" />
                     <span className="text-gray-700">{landlord.phone}</span>
                   </a>
@@ -616,9 +727,74 @@ export const HouseDetails = () => {
               </div>
             </div>
 
-            <button onClick={() => setShowContactModal(false)} className="w-full py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition">
+            <button
+              onClick={() => setShowContactModal(false)}
+              className="w-full py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+            >
               Close
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ Visit Modal */}
+      {showVisitModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Schedule a Visit</h3>
+                <p className="text-sm text-gray-600">
+                  Pick a time. Landlord will approve/reject.
+                </p>
+              </div>
+              <button onClick={() => setShowVisitModal(false)} className="text-gray-500 hover:text-gray-700">
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={submitVisitRequest} className="mt-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Visit Date & Time</label>
+                <input
+                  type="datetime-local"
+                  value={visitForm.scheduledAt}
+                  onChange={(e) => setVisitForm((p) => ({ ...p, scheduledAt: e.target.value }))}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+                <p className="mt-2 text-xs text-gray-500">
+                  Tip: Choose a time at least 30–60 mins from now.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Message (optional)</label>
+                <textarea
+                  value={visitForm.note}
+                  onChange={(e) => setVisitForm((p) => ({ ...p, note: e.target.value }))}
+                  rows={3}
+                  placeholder="Example: I can visit after 6 PM. Please confirm."
+                  className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={visitLoading}
+                className="w-full py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition flex items-center justify-center gap-2 disabled:opacity-60"
+              >
+                {visitLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Calendar className="w-5 h-5" />}
+                {visitLoading ? "Sending..." : "Send Visit Request"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowVisitModal(false)}
+                className="w-full py-2.5 border border-gray-200 text-gray-800 rounded-xl hover:bg-gray-50 transition"
+              >
+                Cancel
+              </button>
+            </form>
           </div>
         </div>
       )}
@@ -630,7 +806,9 @@ export const HouseDetails = () => {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-xl font-bold text-gray-900">Pay Booking Amount</h3>
-                <p className="text-sm text-gray-600">Pay ₹{bookingAmount.toLocaleString("en-IN")} to book this property.</p>
+                <p className="text-sm text-gray-600">
+                  Pay ₹{bookingAmount.toLocaleString("en-IN")} to book this property.
+                </p>
               </div>
               <button onClick={closeBookingModal} className="text-gray-500 hover:text-gray-700">
                 ✕
@@ -665,7 +843,10 @@ export const HouseDetails = () => {
                   {cancelLoading ? "Cancelling..." : "Cancel Booking"}
                 </button>
 
-                <button onClick={closeBookingModal} className="mt-3 w-full py-2.5 border border-gray-200 text-gray-800 rounded-lg hover:bg-gray-50 transition">
+                <button
+                  onClick={closeBookingModal}
+                  className="mt-3 w-full py-2.5 border border-gray-200 text-gray-800 rounded-lg hover:bg-gray-50 transition"
+                >
                   Close
                 </button>
               </div>
@@ -675,7 +856,9 @@ export const HouseDetails = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-gray-600">Amount</p>
-                      <p className="text-2xl font-bold text-gray-900">₹{Number(payData.amount || 0).toLocaleString("en-IN")}</p>
+                      <p className="text-2xl font-bold text-gray-900">
+                        ₹{Number(payData.amount || 0).toLocaleString("en-IN")}
+                      </p>
                       <p className="text-xs text-gray-500 mt-1">
                         Pay To: <b>{payData?.payee?.upiId || "UPI"}</b>
                       </p>
@@ -699,11 +882,17 @@ export const HouseDetails = () => {
                     Copy UPI Link
                   </button>
 
-                  <button onClick={() => (window.location.href = payData.upiLink)} className="w-full py-3 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-700 transition">
+                  <button
+                    onClick={() => (window.location.href = payData.upiLink)}
+                    className="w-full py-3 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-700 transition"
+                  >
                     Open UPI App
                   </button>
 
-                  <button onClick={markAsPaid} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition">
+                  <button
+                    onClick={markAsPaid}
+                    className="w-full py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition"
+                  >
                     I Have Paid
                   </button>
 
@@ -716,7 +905,6 @@ export const HouseDetails = () => {
                     {checkingStatus ? "Checking..." : "Check Status"}
                   </button>
 
-                  {/* ✅ Optional cancel even after initiate */}
                   <button
                     onClick={cancelBooking}
                     disabled={cancelLoading}
