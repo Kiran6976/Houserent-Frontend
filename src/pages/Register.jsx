@@ -83,7 +83,9 @@ export const Register = () => {
 
     // ✅ Legal check
     if (!acceptedLegal) {
-      setLegalError("You must accept the Terms & Conditions and Privacy Policy to continue");
+      setLegalError(
+        "You must accept the Terms & Conditions and Privacy Policy to continue"
+      );
     } else {
       setLegalError("");
     }
@@ -140,9 +142,30 @@ export const Register = () => {
 
       if (result?.success) {
         showToast("Email verified successfully!", "success");
-        if (result?.user?.role === "landlord") navigate("/landlord");
-        else if (result?.user?.role === "admin") navigate("/admin");
-        else navigate("/tenant");
+
+        const role = result?.user?.role;
+
+        // ✅ FIX: Redirect to routes that actually exist in App.jsx
+        if (role === "admin") {
+          navigate("/admin/dashboard");
+          return;
+        }
+
+        if (role === "landlord") {
+          // If your backend returns some verified flag, we can use it.
+          // Otherwise, safest is to go to payment/verification screen first (route exists).
+          const isVerified =
+            result?.user?.isVerifiedLandlord ||
+            result?.user?.verifiedLandlord ||
+            result?.user?.isVerified ||
+            result?.user?.verified;
+
+          navigate(isVerified ? "/landlord/dashboard" : "/landlord/payment");
+          return;
+        }
+
+        // tenant default: go Home (or you can change to /tenant/houses)
+        navigate("/");
       } else {
         showToast(result?.message || "Invalid OTP", "error");
       }

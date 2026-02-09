@@ -1,10 +1,14 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { HouseCard } from "../components/HouseCard";
 import { Search, SlidersHorizontal, X, Loader2, Home } from "lucide-react";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
 export const TenantHouses = () => {
+  const location = useLocation();
+  const gridRef = useRef(null);
+
   const [houses, setHouses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
@@ -26,19 +30,19 @@ export const TenantHouses = () => {
 
       const params = new URLSearchParams();
 
-      const location = (opts.location ?? filters.location).trim();
-      const type = (opts.type ?? filters.type).trim();
-      const beds = (opts.beds ?? filters.beds).trim();
-      const minRent = (opts.minRent ?? filters.minRent).trim();
-      const maxRent = (opts.maxRent ?? filters.maxRent).trim();
-      const search = (opts.search ?? searchQuery).trim();
+      const locationV = (opts.location ?? filters.location).trim();
+      const typeV = (opts.type ?? filters.type).trim();
+      const bedsV = (opts.beds ?? filters.beds).trim();
+      const minRentV = (opts.minRent ?? filters.minRent).trim();
+      const maxRentV = (opts.maxRent ?? filters.maxRent).trim();
+      const searchV = (opts.search ?? searchQuery).trim();
 
-      if (location) params.set("location", location);
-      if (type) params.set("type", type);
-      if (beds) params.set("beds", beds);
-      if (minRent) params.set("minRent", minRent);
-      if (maxRent) params.set("maxRent", maxRent);
-      if (search) params.set("search", search);
+      if (locationV) params.set("location", locationV);
+      if (typeV) params.set("type", typeV);
+      if (bedsV) params.set("beds", bedsV);
+      if (minRentV) params.set("minRent", minRentV);
+      if (maxRentV) params.set("maxRent", maxRentV);
+      if (searchV) params.set("search", searchV);
 
       const url = `${API_URL}/api/houses?${params.toString()}`;
 
@@ -56,10 +60,42 @@ export const TenantHouses = () => {
     }
   };
 
+  // ✅ Apply query params (coming from Home quick search or slider)
   useEffect(() => {
-    loadHouses();
+    const params = new URLSearchParams(location.search);
+
+    const nextFilters = {
+      location: params.get("location") || "",
+      minRent: params.get("minRent") || "",
+      maxRent: params.get("maxRent") || "",
+      type: params.get("type") || "",
+      beds: params.get("beds") || "",
+    };
+
+    const nextSearch = params.get("search") || "";
+
+    setFilters(nextFilters);
+    setSearchQuery(nextSearch);
+
+    // load using params
+    loadHouses({
+      ...nextFilters,
+      search: nextSearch,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [location.search]);
+
+  // ✅ Auto-scroll to grid when coming from Home slider
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const focus = params.get("focus");
+
+    if (!loading && focus === "grid") {
+      setTimeout(() => {
+        gridRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 150);
+    }
+  }, [location.search, loading]);
 
   const applyFilters = async () => {
     setShowFilters(false);
@@ -67,43 +103,33 @@ export const TenantHouses = () => {
   };
 
   const clearFilters = async () => {
-    setFilters({
+    const reset = {
       location: "",
       minRent: "",
       maxRent: "",
       type: "",
       beds: "",
-    });
+    };
+    setFilters(reset);
     setSearchQuery("");
     setShowFilters(false);
 
-    // load without filters/search
     await loadHouses({
-      location: "",
-      minRent: "",
-      maxRent: "",
-      type: "",
-      beds: "",
+      ...reset,
       search: "",
     });
   };
 
-  // If you want "live search" like Google, uncomment this:
-  // useEffect(() => {
-  //   const t = setTimeout(() => loadHouses(), 350);
-  //   return () => clearTimeout(t);
-  // }, [searchQuery]);
-
-  // Since backend already filters by search, this is just a safety fallback:
+  // Since backend already filters by search, this is a safety fallback:
   const filteredHouses = useMemo(() => {
     if (!searchQuery.trim()) return houses;
 
     const q = searchQuery.toLowerCase();
     return houses.filter((house) => {
       const title = (house.title || "").toLowerCase();
-      const location = (house.location || "").toLowerCase();
+      const loc = (house.location || "").toLowerCase();
       const description = (house.description || "").toLowerCase();
-      return title.includes(q) || location.includes(q) || description.includes(q);
+      return title.includes(q) || loc.includes(q) || description.includes(q);
     });
   }, [houses, searchQuery]);
 
@@ -148,7 +174,6 @@ export const TenantHouses = () => {
               <span className="hidden sm:inline">Filters</span>
             </button>
 
-            {/* Optional: Search button to use backend search immediately */}
             <button
               onClick={() => loadHouses()}
               className="px-6 py-4 bg-white text-indigo-700 rounded-xl hover:bg-indigo-50 transition font-medium"
@@ -200,7 +225,7 @@ export const TenantHouses = () => {
                   onChange={(e) =>
                     setFilters((prev) => ({ ...prev, minRent: e.target.value }))
                   }
-                  placeholder="$0"
+                  placeholder="₹0"
                   className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 />
               </div>
@@ -278,15 +303,18 @@ export const TenantHouses = () => {
         {/* Results Info */}
         <div className="flex items-center justify-between mb-6">
           <p className="text-gray-600">
-            Showing{" "}
-            <span className="font-semibold">{filteredHouses.length}</span>{" "}
+            Showing <span className="font-semibold">{filteredHouses.length}</span>{" "}
             properties
           </p>
         </div>
 
         {/* Houses Grid */}
         {filteredHouses.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div
+            ref={gridRef}
+            id="properties-grid"
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 scroll-mt-24"
+          >
             {filteredHouses.map((house) => (
               <HouseCard key={house._id || house.id} house={house} />
             ))}

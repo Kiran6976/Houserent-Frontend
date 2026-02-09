@@ -15,6 +15,7 @@ import { NotFound } from "./pages/NotFound";
 import { Terms } from "./pages/Terms";
 import { Privacy } from "./pages/Privacy";
 import { RefundPolicy } from "./pages/RefundPolicy";
+import { MyRents } from "./pages/MyRents";
 // Admin Pages
 import { AdminLogin } from "./pages/AdminLogin";
 import { AdminDashboard } from "./pages/AdminDashboard";
@@ -45,6 +46,7 @@ export function App() {
               <Route path="/terms" element={<Terms />} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/refund-policy" element={<RefundPolicy />} />
+              
 
 
               {/* Admin Routes */}
@@ -115,6 +117,15 @@ export function App() {
                 element={
                   <ProtectedRoute requiredRole="landlord" requireVerifiedLandlord>
                     <LandlordTenants />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/tenant/my-rents"
+                element={
+                  <ProtectedRoute requiredRole="tenant">
+                    <MyRents />
                   </ProtectedRoute>
                 }
               />

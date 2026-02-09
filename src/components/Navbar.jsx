@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Home, LogOut, User, Menu, X, Building2 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { Home, LogOut, User, Menu, X, Building2, Key } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 
 export const Navbar = () => {
   const { user, isAuthenticated, logout } = useAuth();
@@ -10,11 +10,14 @@ export const Navbar = () => {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate("/login");
   };
 
   const AdminLink = () => (
-    <Link to={isAuthenticated && user?.role === 'admin' ? '/admin/dashboard' : '/admin'} className="text-gray-700 hover:text-indigo-600 transition">
+    <Link
+      to={isAuthenticated && user?.role === "admin" ? "/admin/dashboard" : "/admin"}
+      className="text-gray-700 hover:text-indigo-600 transition"
+    >
       Admin
     </Link>
   );
@@ -34,9 +37,12 @@ export const Navbar = () => {
           <div className="hidden md:flex items-center gap-6">
             {isAuthenticated ? (
               <>
-                {user?.role === 'landlord' ? (
+                {user?.role === "landlord" ? (
                   <>
-                    <Link to="/landlord/dashboard" className="flex items-center gap-1 text-gray-700 hover:text-indigo-600 transition">
+                    <Link
+                      to="/landlord/dashboard"
+                      className="flex items-center gap-1 text-gray-700 hover:text-indigo-600 transition"
+                    >
                       <Home className="w-4 h-4" />
                       Dashboard
                     </Link>
@@ -44,11 +50,23 @@ export const Navbar = () => {
                       Add House
                     </Link>
                   </>
-                ) : user?.role === 'tenant' ? (
+                ) : user?.role === "tenant" ? (
                   <>
-                    <Link to="/tenant/houses" className="flex items-center gap-1 text-gray-700 hover:text-indigo-600 transition">
+                    <Link
+                      to="/tenant/houses"
+                      className="flex items-center gap-1 text-gray-700 hover:text-indigo-600 transition"
+                    >
                       <Home className="w-4 h-4" />
                       Browse Houses
+                    </Link>
+
+                    {/* ✅ NEW: My Rents */}
+                    <Link
+                      to="/tenant/my-rents"
+                      className="flex items-center gap-1 text-gray-700 hover:text-indigo-600 transition"
+                    >
+                      <Key className="w-4 h-4" />
+                      My Rents
                     </Link>
                   </>
                 ) : (
@@ -58,6 +76,7 @@ export const Navbar = () => {
                     </Link>
                   </>
                 )}
+
                 <div className="flex items-center gap-3 pl-4 border-l">
                   <div className="flex items-center gap-2 text-gray-600">
                     <User className="w-4 h-4" />
@@ -66,6 +85,7 @@ export const Navbar = () => {
                       {user?.role}
                     </span>
                   </div>
+
                   <button
                     onClick={handleLogout}
                     className="flex items-center gap-1 text-gray-600 hover:text-red-600 transition"
@@ -116,7 +136,8 @@ export const Navbar = () => {
                     {user?.role}
                   </span>
                 </div>
-                {user?.role === 'landlord' ? (
+
+                {user?.role === "landlord" ? (
                   <>
                     <Link
                       to="/landlord/dashboard"
@@ -133,14 +154,25 @@ export const Navbar = () => {
                       Add House
                     </Link>
                   </>
-                ) : user?.role === 'tenant' ? (
-                  <Link
-                    to="/tenant/houses"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="block text-gray-700 hover:text-indigo-600"
-                  >
-                    Browse Houses
-                  </Link>
+                ) : user?.role === "tenant" ? (
+                  <>
+                    <Link
+                      to="/tenant/houses"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="block text-gray-700 hover:text-indigo-600"
+                    >
+                      Browse Houses
+                    </Link>
+
+                    {/* ✅ NEW: My Rents */}
+                    <Link
+                      to="/tenant/my-rents"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="block text-gray-700 hover:text-indigo-600"
+                    >
+                      My Rents
+                    </Link>
+                  </>
                 ) : (
                   <Link
                     to="/admin/dashboard"
@@ -150,8 +182,12 @@ export const Navbar = () => {
                     Admin
                   </Link>
                 )}
+
                 <button
-                  onClick={() => { handleLogout(); setMobileMenuOpen(false); }}
+                  onClick={() => {
+                    handleLogout();
+                    setMobileMenuOpen(false);
+                  }}
                   className="flex items-center gap-1 text-red-600"
                 >
                   <LogOut className="w-4 h-4" />

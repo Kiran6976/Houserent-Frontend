@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -13,7 +13,11 @@ import {
   BadgeCheck,
   Users,
   Home as HomeIcon,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
+
+const API_URL = import.meta.env.VITE_API_URL;
 
 export const HomePage = () => {
   const { isAuthenticated, user } = useAuth();
@@ -41,6 +45,23 @@ export const HomePage = () => {
     search: "",
   });
 
+  // ✅ Featured slider data
+  const [featured, setFeatured] = useState([]);
+  const sliderRef = useRef(null);
+
+  useEffect(() => {
+    const loadFeatured = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/houses`);
+        const data = await res.json();
+        if (res.ok && Array.isArray(data)) setFeatured(data.slice(0, 12));
+      } catch (e) {
+        console.log(e);
+      }
+    };
+    loadFeatured();
+  }, []);
+
   const onChangeQS = (e) => {
     const { name, value } = e.target;
     setQs((prev) => ({ ...prev, [name]: value }));
@@ -52,13 +73,15 @@ export const HomePage = () => {
 
     const params = new URLSearchParams();
 
-    // only set non-empty fields
     if (qs.location.trim()) params.set("location", qs.location.trim());
     if (qs.minRent) params.set("minRent", qs.minRent);
     if (qs.maxRent) params.set("maxRent", qs.maxRent);
     if (qs.type) params.set("type", qs.type);
     if (qs.beds) params.set("beds", qs.beds);
     if (qs.search.trim()) params.set("search", qs.search.trim());
+
+    // ✅ also focus grid
+    params.set("focus", "grid");
 
     navigate(`/tenant/houses?${params.toString()}`);
   };
@@ -68,19 +91,33 @@ export const HomePage = () => {
   }, [qs.location]);
 
   const budgetLabel = useMemo(() => {
-    const min = qs.minRent ? `₹${Number(qs.minRent).toLocaleString("en-IN")}` : "Any";
-    const max = qs.maxRent ? `₹${Number(qs.maxRent).toLocaleString("en-IN")}` : "Any";
+    const min = qs.minRent
+      ? `₹${Number(qs.minRent).toLocaleString("en-IN")}`
+      : "Any";
+    const max = qs.maxRent
+      ? `₹${Number(qs.maxRent).toLocaleString("en-IN")}`
+      : "Any";
     return `${min} – ${max}`;
   }, [qs.minRent, qs.maxRent]);
 
   const typeLabel = useMemo(() => {
     if (!qs.type) return "Any";
-    // match your house types if you use apartment/room/house
     if (qs.type === "apartment") return "Apartment";
     if (qs.type === "room") return "Room";
     if (qs.type === "house") return "House";
     return qs.type;
   }, [qs.type]);
+
+  const goToBrowse = () => {
+    navigate("/tenant/houses?focus=grid");
+  };
+
+  const scrollSlider = (dir = 1) => {
+    const el = sliderRef.current;
+    if (!el) return;
+    const amount = Math.round(el.clientWidth * 0.9);
+    el.scrollBy({ left: dir * amount, behavior: "smooth" });
+  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -111,7 +148,8 @@ export const HomePage = () => {
               </h1>
 
               <p className="mt-5 text-lg md:text-xl text-white/85 max-w-2xl">
-                Discover verified listings, contact landlords instantly, and book with confidence. Faster decisions, fewer hassles.
+                Discover verified listings, contact landlords instantly, and
+                book with confidence. Faster decisions, fewer hassles.
               </p>
 
               {/* CTAs */}
@@ -158,7 +196,9 @@ export const HomePage = () => {
                 className="rounded-3xl bg-white/10 border border-white/20 backdrop-blur-xl shadow-2xl shadow-black/25 p-6"
               >
                 <div className="flex items-center justify-between">
-                  <div className="text-white font-semibold text-lg">Quick Search</div>
+                  <div className="text-white font-semibold text-lg">
+                    Quick Search
+                  </div>
                   <div className="text-white/70 text-sm flex items-center gap-1">
                     <MapPin className="w-4 h-4" /> {locationLabel}
                   </div>
@@ -204,7 +244,9 @@ export const HomePage = () => {
                     </div>
 
                     <div className="rounded-2xl bg-white/10 border border-white/15 p-4 col-span-2">
-                      <label className="text-white/70 text-xs">Property Type</label>
+                      <label className="text-white/70 text-xs">
+                        Property Type
+                      </label>
                       <select
                         name="type"
                         value={qs.type}
@@ -306,9 +348,12 @@ export const HomePage = () => {
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-14">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900">Everything you need to rent smarter</h2>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
+              Everything you need to rent smarter
+            </h2>
             <p className="mt-3 text-lg text-gray-600 max-w-2xl mx-auto">
-              Clean listings, verified owners, clear pricing, and a booking flow built for real usage.
+              Clean listings, verified owners, clear pricing, and a booking flow
+              built for real usage.
             </p>
           </div>
 
@@ -328,6 +373,103 @@ export const HomePage = () => {
               title="Premium experience"
               desc="Clean UI, smooth interactions, and dashboards that make it easy to manage everything."
             />
+          </div>
+        </div>
+      </section>
+
+      {/* ✅ PROPERTIES SLIDER */}
+      <section className="py-16 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-end justify-between gap-4 mb-8">
+            <div>
+              <h2 className="text-3xl font-bold text-gray-900">
+                Browse Properties
+              </h2>
+              <p className="mt-2 text-gray-600">
+                A quick look at available listings — tap any card to explore more.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => scrollSlider(-1)}
+                className="p-2 rounded-xl border border-gray-200 hover:bg-gray-50"
+                aria-label="Scroll left"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => scrollSlider(1)}
+                className="p-2 rounded-xl border border-gray-200 hover:bg-gray-50"
+                aria-label="Scroll right"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          {featured.length > 0 ? (
+            <div
+              ref={sliderRef}
+              className="flex gap-5 overflow-x-auto scroll-smooth pb-3"
+              style={{ scrollbarWidth: "none" }}
+            >
+              {featured.map((house) => {
+                const image0 =
+                  (Array.isArray(house?.images) && house.images[0]) ||
+                  "https://via.placeholder.com/400x300?text=No+Image";
+
+                return (
+                  <button
+                    key={house._id || house.id}
+                    onClick={goToBrowse}
+                    className="min-w-[280px] max-w-[280px] sm:min-w-[320px] sm:max-w-[320px] text-left bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition"
+                  >
+                    <div className="h-44 overflow-hidden">
+                      <img
+                        src={image0}
+                        alt={house?.title || "Property"}
+                        className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                      />
+                    </div>
+                    <div className="p-4">
+                      <div className="font-semibold text-gray-900 line-clamp-1">
+                        {house?.title || "Untitled Property"}
+                      </div>
+                      <div className="mt-1 text-sm text-gray-500 line-clamp-1">
+                        {house?.location || "—"}
+                      </div>
+
+                      <div className="mt-3 flex items-center justify-between">
+                        <div className="text-indigo-600 font-bold">
+                          ₹{Number(house?.rent || 0).toLocaleString("en-IN")}
+                          <span className="text-gray-500 font-normal text-sm">
+                            /mo
+                          </span>
+                        </div>
+                        <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700">
+                          {house?.type || "property"}
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-gray-200 p-10 text-center text-gray-600">
+              No properties available right now.
+            </div>
+          )}
+
+          <div className="mt-8 text-center">
+            <button
+              onClick={goToBrowse}
+              className="inline-flex items-center justify-center gap-2 px-7 py-3 rounded-2xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition"
+            >
+              Browse All Properties
+              <ArrowRight className="w-5 h-5" />
+            </button>
           </div>
         </div>
       </section>
@@ -369,70 +511,67 @@ export const HomePage = () => {
 
       {/* FOOTER */}
       <footer className="bg-gray-950 text-white">
-  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-    <div className="flex flex-col md:flex-row gap-10 md:items-center md:justify-between">
-      
-      {/* Brand */}
-      <div>
-        <div className="flex items-center gap-2 text-2xl font-bold">
-          <Building2 className="w-8 h-8" />
-          <span>HomeRent</span>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="flex flex-col md:flex-row gap-10 md:items-center md:justify-between">
+            {/* Brand */}
+            <div>
+              <div className="flex items-center gap-2 text-2xl font-bold">
+                <Building2 className="w-8 h-8" />
+                <span>HomeRent</span>
+              </div>
+              <p className="mt-2 text-white/70 max-w-md">
+                A modern rental platform designed for speed, trust, and simplicity.
+              </p>
+            </div>
+
+            {/* Footer Links */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-6 text-sm text-white/70">
+              {/* Explore */}
+              <div className="space-y-2">
+                <div className="text-white font-semibold">Explore</div>
+                <Link className="block hover:text-white" to="/tenant/houses">
+                  Properties
+                </Link>
+                <Link className="block hover:text-white" to="/register">
+                  Register
+                </Link>
+              </div>
+
+              {/* Account */}
+              <div className="space-y-2">
+                <div className="text-white font-semibold">Account</div>
+                <Link className="block hover:text-white" to={primaryCtaLink}>
+                  Dashboard
+                </Link>
+                <span className="block text-white/50">Support: coming soon</span>
+              </div>
+
+              {/* Legal */}
+              <div className="space-y-2">
+                <div className="text-white font-semibold">Legal</div>
+                <Link className="block hover:text-white" to="/terms">
+                  Terms & Conditions
+                </Link>
+                <Link className="block hover:text-white" to="/privacy">
+                  Privacy Policy
+                </Link>
+                <Link className="block hover:text-white" to="/refund-policy">
+                  Refund & Cancellation
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Bar */}
+          <div className="mt-10 pt-6 border-t border-white/10 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between text-white/60 text-sm">
+            <span>© {new Date().getFullYear()} HomeRent. All rights reserved.</span>
+            <span className="inline-flex items-center gap-2">
+              <HomeIcon className="w-4 h-4" />
+              Built with MERN
+            </span>
+          </div>
         </div>
-        <p className="mt-2 text-white/70 max-w-md">
-          A modern rental platform designed for speed, trust, and simplicity.
-        </p>
-      </div>
-
-      {/* Footer Links */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-6 text-sm text-white/70">
-        
-        {/* Explore */}
-        <div className="space-y-2">
-          <div className="text-white font-semibold">Explore</div>
-          <Link className="block hover:text-white" to="/tenant/houses">
-            Properties
-          </Link>
-          <Link className="block hover:text-white" to="/register">
-            Register
-          </Link>
-        </div>
-
-        {/* Account */}
-        <div className="space-y-2">
-          <div className="text-white font-semibold">Account</div>
-          <Link className="block hover:text-white" to={primaryCtaLink}>
-            Dashboard
-          </Link>
-          <span className="block text-white/50">Support: coming soon</span>
-        </div>
-
-        {/* 🔐 Legal (Razorpay REQUIRED) */}
-        <div className="space-y-2">
-          <div className="text-white font-semibold">Legal</div>
-          <Link className="block hover:text-white" to="/terms">
-            Terms & Conditions
-          </Link>
-          <Link className="block hover:text-white" to="/privacy">
-            Privacy Policy
-          </Link>
-          <Link className="block hover:text-white" to="/refund-policy">
-            Refund & Cancellation
-          </Link>
-        </div>
-      </div>
-    </div>
-
-    {/* Bottom Bar */}
-    <div className="mt-10 pt-6 border-t border-white/10 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between text-white/60 text-sm">
-      <span>© {new Date().getFullYear()} HomeRent. All rights reserved.</span>
-      <span className="inline-flex items-center gap-2">
-        <HomeIcon className="w-4 h-4" />
-        Built with MERN
-      </span>
-    </div>
-  </div>
-</footer>
-
+      </footer>
     </div>
   );
 };

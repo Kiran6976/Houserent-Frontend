@@ -2,10 +2,8 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from "
 
 const AuthContext = createContext(undefined);
 
-// ✅ Change this if your backend runs on different port/domain
 const API_URL = import.meta.env.VITE_API_URL;
 
-// LocalStorage keys
 const LS_USER_KEY = "homerent_current_user";
 const LS_TOKEN_KEY = "homerent_token";
 
@@ -14,7 +12,6 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // ✅ Restore session on reload
   useEffect(() => {
     try {
       const savedUser = localStorage.getItem(LS_USER_KEY);
@@ -32,7 +29,6 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  // ✅ small helper to make requests
   const request = async (path, options = {}) => {
     const res = await fetch(`${API_URL}${path}`, {
       ...options,
@@ -57,13 +53,11 @@ export const AuthProvider = ({ children }) => {
     setUser(newUser);
   };
 
-  // ✅ NEW: update only user (useful when landlord updates UPI etc.)
   const updateUser = (newUser) => {
     localStorage.setItem(LS_USER_KEY, JSON.stringify(newUser));
     setUser(newUser);
   };
 
-  // ✅ NEW (optional): update only token (if needed later)
   const updateToken = (newToken) => {
     localStorage.setItem(LS_TOKEN_KEY, newToken);
     setToken(newToken);
@@ -76,7 +70,6 @@ export const AuthProvider = ({ children }) => {
     setToken(null);
   };
 
-  // ✅ LOGIN (blocked if email not verified by backend)
   const login = async (email, password) => {
     try {
       const { ok, data, status } = await request("/api/auth/login", {
@@ -107,7 +100,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // ✅ REGISTER (now sends OTP, does NOT auto-login)
   const register = async (userData) => {
     try {
       const { ok, data } = await request("/api/auth/register", {
@@ -134,7 +126,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // ✅ VERIFY EMAIL OTP (backend returns token + user after verify)
   const verifyEmailOtp = async ({ email, otp }) => {
     try {
       const { ok, data } = await request("/api/auth/verify-email", {
@@ -162,7 +153,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // ✅ RESEND OTP
   const resendOtp = async ({ email }) => {
     try {
       const { ok, data } = await request("/api/auth/resend-otp", {
@@ -186,7 +176,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // ✅ OPTIONAL: refresh user from /me (useful after reload)
   const fetchMe = async () => {
     if (!token) return { success: false };
     try {
@@ -212,7 +201,7 @@ export const AuthProvider = ({ children }) => {
     () => ({
       user,
       token,
-      isAuthenticated: !!user,
+      isAuthenticated: !!token && !!user,
       loading,
 
       login,
@@ -221,7 +210,6 @@ export const AuthProvider = ({ children }) => {
       resendOtp,
       fetchMe,
 
-      // ✅ NEW exports
       updateUser,
       updateToken,
 
