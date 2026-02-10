@@ -176,6 +176,60 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // ✅ NEW: Forgot Password (send reset link)
+  const forgotPassword = async (email) => {
+    try {
+      const { ok, data } = await request("/api/auth/forgot-password", {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      });
+
+      if (!ok) {
+        return {
+          success: false,
+          message: data?.message || "Failed to send reset link",
+        };
+      }
+
+      return {
+        success: true,
+        message: data?.message || "If the email exists, a reset link has been sent.",
+      };
+    } catch (err) {
+      return {
+        success: false,
+        message: "Network error. Please try again.",
+      };
+    }
+  };
+
+  // ✅ NEW: Reset Password (token from URL)
+  const resetPassword = async ({ token: resetToken, password }) => {
+    try {
+      const { ok, data } = await request(`/api/auth/reset-password/${resetToken}`, {
+        method: "POST",
+        body: JSON.stringify({ password }),
+      });
+
+      if (!ok) {
+        return {
+          success: false,
+          message: data?.message || "Failed to reset password",
+        };
+      }
+
+      return {
+        success: true,
+        message: data?.message || "Password updated successfully. Please login.",
+      };
+    } catch (err) {
+      return {
+        success: false,
+        message: "Network error. Please try again.",
+      };
+    }
+  };
+
   const fetchMe = async () => {
     if (!token) return { success: false };
     try {
@@ -208,6 +262,11 @@ export const AuthProvider = ({ children }) => {
       register,
       verifyEmailOtp,
       resendOtp,
+
+      // ✅ NEW
+      forgotPassword,
+      resetPassword,
+
       fetchMe,
 
       updateUser,

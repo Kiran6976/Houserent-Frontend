@@ -1,82 +1,60 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { useToast } from '../context/ToastContext';
-import { Building2, Loader2, Mail, Lock } from 'lucide-react';
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
+import { Building2, Loader2, Mail, Lock } from "lucide-react";
 
 export const Login = () => {
   const { login } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
-  
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
   const validate = () => {
     const newErrors = {};
-    
+
     if (!email.trim()) {
-      newErrors.email = 'Email is required';
+      newErrors.email = "Email is required";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      newErrors.email = 'Please enter a valid email';
+      newErrors.email = "Please enter a valid email";
     }
-    
+
     if (!password) {
-      newErrors.password = 'Password is required';
+      newErrors.password = "Password is required";
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validate()) return;
-    
+
     setLoading(true);
     try {
       const result = await login(email, password);
-      
+
       if (result.success) {
-        showToast('Login successful!', 'success');
-        // Get fresh user data to determine redirect
-        const userData = localStorage.getItem('homerent_current_user');
+        showToast("Login successful!", "success");
+
+        const userData = localStorage.getItem("homerent_current_user");
         if (userData) {
           const user = JSON.parse(userData);
-          navigate(user.role === 'landlord' ? '/landlord/dashboard' : '/tenant/houses');
+          navigate(user.role === "landlord" ? "/landlord/dashboard" : "/tenant/houses");
+        } else {
+          navigate("/"); // fallback
         }
       } else {
-        showToast(result.message, 'error');
+        showToast(result.message || "Login failed", "error");
       }
     } catch (err) {
-      showToast('Login failed. Please try again.', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDemoLogin = async (role) => {
-    const credentials = role === 'landlord' 
-      ? { email: 'landlord@demo.com', password: 'password123' }
-      : { email: 'tenant@demo.com', password: 'password123' };
-    
-    setEmail(credentials.email);
-    setPassword(credentials.password);
-    
-    setLoading(true);
-    try {
-      const result = await login(credentials.email, credentials.password);
-      if (result.success) {
-        showToast(`Logged in as demo ${role}!`, 'success');
-        navigate(role === 'landlord' ? '/landlord/dashboard' : '/tenant/houses');
-      } else {
-        showToast(result.message, 'error');
-      }
-    } catch (err) {
-      showToast('Login failed. Please try again.', 'error');
+      showToast("Login failed. Please try again.", "error");
     } finally {
       setLoading(false);
     }
@@ -106,10 +84,10 @@ export const Login = () => {
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value);
-                    if (errors.email) setErrors(prev => ({ ...prev, email: undefined }));
+                    if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }));
                   }}
                   className={`w-full pl-10 pr-4 py-3 rounded-lg border ${
-                    errors.email ? 'border-red-500' : 'border-gray-300'
+                    errors.email ? "border-red-500" : "border-gray-300"
                   } focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition`}
                   placeholder="john@example.com"
                 />
@@ -127,15 +105,30 @@ export const Login = () => {
                   value={password}
                   onChange={(e) => {
                     setPassword(e.target.value);
-                    if (errors.password) setErrors(prev => ({ ...prev, password: undefined }));
+                    if (errors.password) setErrors((prev) => ({ ...prev, password: undefined }));
                   }}
                   className={`w-full pl-10 pr-4 py-3 rounded-lg border ${
-                    errors.password ? 'border-red-500' : 'border-gray-300'
+                    errors.password ? "border-red-500" : "border-gray-300"
                   } focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition`}
                   placeholder="••••••••"
                 />
               </div>
-              {errors.password && <p className="mt-1 text-sm text-red-500">{errors.password}</p>}
+
+              <div className="mt-2 flex items-center justify-between">
+                {errors.password ? (
+                  <p className="text-sm text-red-500">{errors.password}</p>
+                ) : (
+                  <span />
+                )}
+
+                {/* ✅ Forgot Password link */}
+                <Link
+                  to="/forgot-password"
+                  className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
+                >
+                  Forgot password?
+                </Link>
+              </div>
             </div>
 
             <button
@@ -149,34 +142,13 @@ export const Login = () => {
                   Signing in...
                 </>
               ) : (
-                'Sign In'
+                "Sign In"
               )}
             </button>
           </form>
 
-          {/* Quick Demo Access */}
-          <div className="mt-6 pt-6 border-t">
-            <p className="text-sm text-gray-500 text-center mb-3">Quick demo access:</p>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => handleDemoLogin('landlord')}
-                disabled={loading}
-                className="py-2 px-4 border-2 border-indigo-200 text-indigo-600 rounded-lg hover:bg-indigo-50 transition flex items-center justify-center gap-2"
-              >
-                🔑 Landlord
-              </button>
-              <button
-                onClick={() => handleDemoLogin('tenant')}
-                disabled={loading}
-                className="py-2 px-4 border-2 border-green-200 text-green-600 rounded-lg hover:bg-green-50 transition flex items-center justify-center gap-2"
-              >
-                🏠 Tenant
-              </button>
-            </div>
-          </div>
-
           <p className="mt-6 text-center text-gray-600">
-            Don't have an account?{' '}
+            Don't have an account?{" "}
             <Link to="/register" className="text-indigo-600 font-medium hover:text-indigo-700">
               Sign up
             </Link>

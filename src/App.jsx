@@ -20,6 +20,8 @@ import { MyVisits } from "./pages/MyVisits";
 import { VisitRequests } from "./pages/VisitRequests";
 import { TenantPayments } from "./pages/TenantPayments";
 import { LandlordRentPayments } from "./pages/LandlordRentPayments";
+import { ForgotPassword } from "./pages/ForgotPassword";
+import { ResetPassword } from "./pages/ResetPassword";
 
 // Admin Pages
 import { AdminLogin } from "./pages/AdminLogin";
@@ -52,6 +54,8 @@ export function App() {
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/refund-policy" element={<RefundPolicy />} />
               <Route path="/tenant/payments/:houseId" element={<TenantPayments />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password/:token" element={<ResetPassword />} />
 
 
 
