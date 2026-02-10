@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { X, Loader2, Calendar, Clock, MessageSquare, Sparkles } from "lucide-react";
 
 export const ScheduleVisitModal = ({ open, onClose, onSubmit, houseTitle }) => {
@@ -8,6 +8,16 @@ export const ScheduleVisitModal = ({ open, onClose, onSubmit, houseTitle }) => {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
+
+  // ✅ lock background scroll
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
 
   const startEndOk = useMemo(() => {
     if (!date || !startTime || !endTime) return false;
@@ -62,7 +72,6 @@ export const ScheduleVisitModal = ({ open, onClose, onSubmit, houseTitle }) => {
     try {
       await onSubmit({ start: start.toISOString(), end: end.toISOString(), message });
       onClose?.();
-      // reset
       setDate("");
       setMessage("");
       setStartTime("10:00");
@@ -82,102 +91,60 @@ export const ScheduleVisitModal = ({ open, onClose, onSubmit, houseTitle }) => {
   })();
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-      <div className="w-full max-w-xl rounded-3xl bg-white shadow-2xl overflow-hidden border border-white/20">
-        {/* Header */}
-        <div className="relative p-6 bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
-          <div className="absolute inset-0 opacity-20 pointer-events-none">
-            <div className="w-full h-full bg-[radial-gradient(circle_at_top_left,white,transparent_55%)]" />
-          </div>
-
-          <div className="relative flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 text-white text-xs font-semibold">
-                <Sparkles className="w-4 h-4" />
-                Visit Request
-              </div>
-
-              <h3 className="mt-3 text-xl font-bold">Schedule a Visit</h3>
-              <p className="mt-1 text-white/85 text-sm truncate">
-                {houseTitle || "Property"}
-              </p>
+    <div
+      className="fixed inset-0 z-50 bg-black/50 px-3 sm:px-4"
+      onMouseDown={(e) => {
+        // ✅ click outside closes
+        if (e.target === e.currentTarget) onClose?.();
+      }}
+    >
+      {/* ✅ Use padding top/bottom and allow modal to sit nicely on small screens */}
+      <div className="min-h-dvh w-full flex items-start sm:items-center justify-center py-6 sm:py-10">
+        {/* ✅ Panel is flex-col + has max height */}
+        <div className="w-full max-w-xl rounded-3xl bg-white shadow-2xl overflow-hidden border border-white/20 flex flex-col h-[95dvh] sm:h-auto sm:max-h-[90dvh]">
+          {/* Header (fixed) */}
+          <div className="relative p-6 bg-gradient-to-r from-indigo-600 to-purple-600 text-white shrink-0">
+            <div className="absolute inset-0 opacity-20 pointer-events-none">
+              <div className="w-full h-full bg-[radial-gradient(circle_at_top_left,white,transparent_55%)]" />
             </div>
 
-            <button
-              onClick={onClose}
-              className="p-2 rounded-xl bg-white/15 hover:bg-white/20 transition"
-              aria-label="Close"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
+            <div className="relative flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 text-white text-xs font-semibold">
+                  <Sparkles className="w-4 h-4" />
+                  Visit Request
+                </div>
 
-        {/* Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
-          {/* Date */}
-          <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
-            <label className="flex items-center gap-2 text-sm font-semibold text-gray-800 mb-2">
-              <Calendar className="w-4 h-4 text-indigo-600" />
-              Choose Date
-            </label>
-
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => {
-                setDate(e.target.value);
-                setErr("");
-              }}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              required
-            />
-          </div>
-
-          {/* Time */}
-          <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
-            <div className="flex items-center justify-between gap-3 mb-3">
-              <label className="flex items-center gap-2 text-sm font-semibold text-gray-800">
-                <Clock className="w-4 h-4 text-indigo-600" />
-                Time Slot
-              </label>
-
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setDuration(30)}
-                  className="px-3 py-1.5 rounded-full text-xs font-semibold border border-gray-200 bg-white hover:bg-gray-50 transition"
-                  title="Set end time to 30 mins after start"
-                >
-                  30m
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDuration(60)}
-                  className="px-3 py-1.5 rounded-full text-xs font-semibold border border-gray-200 bg-white hover:bg-gray-50 transition"
-                  title="Set end time to 1 hour after start"
-                >
-                  1h
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDuration(120)}
-                  className="px-3 py-1.5 rounded-full text-xs font-semibold border border-gray-200 bg-white hover:bg-gray-50 transition"
-                  title="Set end time to 2 hours after start"
-                >
-                  2h
-                </button>
+                <h3 className="mt-3 text-xl font-bold">Schedule a Visit</h3>
+                <p className="mt-1 text-white/85 text-sm truncate">{houseTitle || "Property"}</p>
               </div>
-            </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <div className="text-xs font-medium text-gray-600 mb-1">Start</div>
+              <button
+                onClick={onClose}
+                className="p-2 rounded-xl bg-white/15 hover:bg-white/20 transition"
+                aria-label="Close"
+                type="button"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* ✅ Scrollable content area */}
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <form onSubmit={handleSubmit} className="p-6 space-y-5">
+              {/* Date */}
+              <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                <label className="flex items-center gap-2 text-sm font-semibold text-gray-800 mb-2">
+                  <Calendar className="w-4 h-4 text-indigo-600" />
+                  Choose Date
+                </label>
+
                 <input
-                  type="time"
-                  value={startTime}
+                  type="date"
+                  value={date}
                   onChange={(e) => {
-                    setStartTime(e.target.value);
+                    setDate(e.target.value);
                     setErr("");
                   }}
                   className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
@@ -185,99 +152,159 @@ export const ScheduleVisitModal = ({ open, onClose, onSubmit, houseTitle }) => {
                 />
               </div>
 
-              <div>
-                <div className="text-xs font-medium text-gray-600 mb-1">End</div>
-                <input
-                  type="time"
-                  value={endTime}
-                  onChange={(e) => {
-                    setEndTime(e.target.value);
-                    setErr("");
-                  }}
+              {/* Time */}
+              <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+                  <label className="flex items-center gap-2 text-sm font-semibold text-gray-800">
+                    <Clock className="w-4 h-4 text-indigo-600" />
+                    Time Slot
+                  </label>
+
+                  {/* ✅ Wrap buttons on small screens */}
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setDuration(30)}
+                      className="px-3 py-1.5 rounded-full text-xs font-semibold border border-gray-200 bg-white hover:bg-gray-50 transition"
+                      title="Set end time to 30 mins after start"
+                    >
+                      30m
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDuration(60)}
+                      className="px-3 py-1.5 rounded-full text-xs font-semibold border border-gray-200 bg-white hover:bg-gray-50 transition"
+                      title="Set end time to 1 hour after start"
+                    >
+                      1h
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDuration(120)}
+                      className="px-3 py-1.5 rounded-full text-xs font-semibold border border-gray-200 bg-white hover:bg-gray-50 transition"
+                      title="Set end time to 2 hours after start"
+                    >
+                      2h
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <div className="text-xs font-medium text-gray-600 mb-1">Start</div>
+                    <input
+                      type="time"
+                      value={startTime}
+                      onChange={(e) => {
+                        setStartTime(e.target.value);
+                        setErr("");
+                      }}
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <div className="text-xs font-medium text-gray-600 mb-1">End</div>
+                    <input
+                      type="time"
+                      value={endTime}
+                      onChange={(e) => {
+                        setEndTime(e.target.value);
+                        setErr("");
+                      }}
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {!startEndOk && date && startTime && endTime && (
+                  <p className="mt-2 text-xs text-rose-600">End time must be after start time.</p>
+                )}
+
+                <p className="mt-2 text-xs text-gray-500">Tip: choose a slot at least 30–60 mins from now.</p>
+              </div>
+
+              {/* Message */}
+              <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                <label className="flex items-center gap-2 text-sm font-semibold text-gray-800 mb-2">
+                  <MessageSquare className="w-4 h-4 text-indigo-600" />
+                  Message (optional)
+                </label>
+
+                <textarea
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  rows={3}
                   className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  required
+                  placeholder="Example: I can come after 6 PM. Please confirm."
                 />
               </div>
-            </div>
 
-            {!startEndOk && date && startTime && endTime && (
-              <p className="mt-2 text-xs text-rose-600">
-                End time must be after start time.
-              </p>
-            )}
+              {/* Summary */}
+              {summary && (
+                <div
+                  className={`rounded-2xl p-4 border ${
+                    summary.ok ? "bg-emerald-50 border-emerald-100" : "bg-rose-50 border-rose-100"
+                  }`}
+                >
+                  <div className="text-sm font-semibold text-gray-900">Summary</div>
+                  <div className="mt-1 text-sm text-gray-700">
+                    {summary.ok ? (
+                      <>
+                        <span className="font-medium">From:</span> {fmt(summary.startISO)}{" "}
+                        <span className="text-gray-400">→</span>{" "}
+                        <span className="font-medium">To:</span> {fmt(summary.endISO)}
+                      </>
+                    ) : (
+                      <span className="text-rose-700 font-medium">Invalid slot selected</span>
+                    )}
+                  </div>
+                </div>
+              )}
 
-            <p className="mt-2 text-xs text-gray-500">
-              Tip: choose a slot at least 30–60 mins from now.
-            </p>
+              {/* Error */}
+              {err && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                  {err}
+                </div>
+              )}
+
+              {/* ✅ extra bottom space so last content doesn't hide behind sticky footer */}
+              <div className="h-2" />
+            </form>
           </div>
 
-          {/* Message */}
-          <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
-            <label className="flex items-center gap-2 text-sm font-semibold text-gray-800 mb-2">
-              <MessageSquare className="w-4 h-4 text-indigo-600" />
-              Message (optional)
-            </label>
+          {/* ✅ Sticky footer (always visible) */}
+          <div className="shrink-0 border-t bg-white p-5">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="sm:w-1/2 w-full py-3 rounded-2xl border border-gray-200 bg-white text-gray-800 font-semibold hover:bg-gray-50 transition"
+              >
+                Cancel
+              </button>
 
-            <textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              rows={3}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              placeholder="Example: I can come after 6 PM. Please confirm."
-            />
-          </div>
-
-          {/* Summary */}
-          {summary && (
-            <div className={`rounded-2xl p-4 border ${summary.ok ? "bg-emerald-50 border-emerald-100" : "bg-rose-50 border-rose-100"}`}>
-              <div className="text-sm font-semibold text-gray-900">Summary</div>
-              <div className="mt-1 text-sm text-gray-700">
-                {summary.ok ? (
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={!canSubmit || loading}
+                className="sm:w-1/2 w-full py-3 rounded-2xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 disabled:opacity-50 transition flex items-center justify-center gap-2"
+              >
+                {loading ? (
                   <>
-                    <span className="font-medium">From:</span> {fmt(summary.startISO)}{" "}
-                    <span className="text-gray-400">→</span>{" "}
-                    <span className="font-medium">To:</span> {fmt(summary.endISO)}
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Requesting...
                   </>
                 ) : (
-                  <span className="text-rose-700 font-medium">Invalid slot selected</span>
+                  "Send Request"
                 )}
-              </div>
+              </button>
             </div>
-          )}
-
-          {/* Error */}
-          {err && (
-            <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-              {err}
-            </div>
-          )}
-
-          {/* Footer buttons */}
-          <div className="flex gap-3 pt-1">
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-1/2 py-3 rounded-2xl border border-gray-200 bg-white text-gray-800 font-semibold hover:bg-gray-50 transition"
-            >
-              Cancel
-            </button>
-
-            <button
-              type="submit"
-              disabled={!canSubmit || loading}
-              className="w-1/2 py-3 rounded-2xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 disabled:opacity-50 transition flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Requesting...
-                </>
-              ) : (
-                "Send Request"
-              )}
-            </button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );
