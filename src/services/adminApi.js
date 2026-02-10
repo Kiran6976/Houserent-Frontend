@@ -1,3 +1,4 @@
+// src/services/adminApi.js
 const API_URL = import.meta.env.VITE_API_URL;
 
 const safeJson = async (res) => res.json().catch(() => ({}));
@@ -9,21 +10,7 @@ const throwHttpError = (res, data, fallback) => {
   throw err;
 };
 
-export const adminDeleteUser = async (userId, token) => {
-  const res = await fetch(`${API_URL}/api/admin/users/${userId}`, {
-    method: "DELETE",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  const data = await safeJson(res);
-  if (!res.ok) throwHttpError(res, data, "Delete failed");
-  return data;
-};
-
-export const adminGetBookings = async (token, status = "paid") => {
+export const adminGetBookings = async (token, status = "pending") => {
   const qs = status ? `?status=${encodeURIComponent(status)}` : "";
   const res = await fetch(`${API_URL}/api/admin/bookings${qs}`, {
     headers: {
@@ -34,17 +21,17 @@ export const adminGetBookings = async (token, status = "paid") => {
 
   const data = await safeJson(res);
   if (!res.ok) throwHttpError(res, data, "Failed to load bookings");
-  return { bookings: data?.bookings || [] };
+  return data;
 };
 
 export const adminApproveBooking = async (bookingId, token, note = "") => {
   const res = await fetch(`${API_URL}/api/admin/bookings/${bookingId}/approve`, {
-    method: "PUT", // ✅ FIX: was POST
+    method: "PUT",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ note }), // optional, backend supports it
+    body: JSON.stringify({ note }),
   });
 
   const data = await safeJson(res);
@@ -52,6 +39,20 @@ export const adminApproveBooking = async (bookingId, token, note = "") => {
   return data;
 };
 
+export const adminRejectBooking = async (bookingId, note, token) => {
+  const res = await fetch(`${API_URL}/api/admin/bookings/${bookingId}/reject`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ note }),
+  });
+
+  const data = await safeJson(res);
+  if (!res.ok) throwHttpError(res, data, "Reject failed");
+  return data;
+};
 
 export const adminGetUpiIntent = async (bookingId, token) => {
   const res = await fetch(`${API_URL}/api/admin/bookings/${bookingId}/upi-intent`, {
@@ -62,7 +63,7 @@ export const adminGetUpiIntent = async (bookingId, token) => {
   });
 
   const data = await safeJson(res);
-  if (!res.ok) throwHttpError(res, data, "UPI intent failed");
+  if (!res.ok) throwHttpError(res, data, "Failed to get UPI intent");
   return data;
 };
 
@@ -77,6 +78,6 @@ export const adminMarkTransferred = async (bookingId, payoutTxnId, token) => {
   });
 
   const data = await safeJson(res);
-  if (!res.ok) throwHttpError(res, data, "Mark paid failed");
+  if (!res.ok) throwHttpError(res, data, "Mark transferred failed");
   return data;
 };

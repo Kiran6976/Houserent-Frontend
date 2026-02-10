@@ -14,10 +14,12 @@ import {
   Search,
   Shield,
   History,
+  Image as ImageIcon,
 } from "lucide-react";
 import {
   adminGetBookings,
   adminApproveBooking,
+  adminRejectBooking,
   adminGetUpiIntent,
   adminMarkTransferred,
 } from "../services/adminApi";
@@ -31,20 +33,12 @@ export const AdminPayments = () => {
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState(null);
 
-  // ✅ Two tabs: pending + history
-  // pending -> shows paid/qr_created
-  // history -> shows approved/transferred
-  const [tab, setTab] = useState("pending"); // "pending" | "history"
-
-  // ✅ Status filter inside a tab
-  // pending default -> paid
-  // history default -> approved
-  const [status, setStatus] = useState("paid");
+  const [tab, setTab] = useState("pending"); // pending | history
+  const [status, setStatus] = useState("payment_submitted");
   const [q, setQ] = useState("");
 
-  // ✅ Keep status in sync with tab
   useEffect(() => {
-    if (tab === "pending") setStatus("paid");
+    if (tab === "pending") setStatus("payment_submitted");
     if (tab === "history") setStatus("approved");
   }, [tab]);
 
@@ -52,15 +46,12 @@ export const AdminPayments = () => {
     try {
       setLoading(true);
 
-      // ✅ status mapping for new backend:
-      // pending tab: "pending" (recommended) or allow specific "paid" etc.
-      // history tab: "approved" (recommended)
       const backendStatus =
         tab === "pending"
-          ? status === "paid" || status === "qr_created"
+          ? status === "payment_submitted" || status === "pending"
             ? status
             : "pending"
-          : status === "approved" || status === "transferred"
+          : status === "approved" || status === "transferred" || status === "rejected"
           ? status
           : "approved";
 
@@ -68,7 +59,6 @@ export const AdminPayments = () => {
       setRows(data?.bookings || []);
     } catch (e) {
       showToast(e.message || "Failed to load bookings", "error");
-
       if (e?.statusCode === 401) {
         logout?.();
         navigate("/admin");
@@ -92,20 +82,20 @@ export const AdminPayments = () => {
       const tenant = `${b?.tenantId?.name || ""} ${b?.tenantId?.email || ""}`.toLowerCase();
       const landlord = `${b?.landlordId?.name || ""} ${b?.landlordId?.email || ""}`.toLowerCase();
       const house = `${b?.houseId?.title || ""} ${b?.houseId?.location || ""}`.toLowerCase();
-      const ids = `${b?._id || ""} ${b?.razorpayPaymentId || ""}`.toLowerCase();
+      const ids = `${b?._id || ""} ${b?.tenantUtr || ""} ${b?.payoutTxnId || ""}`.toLowerCase();
       return tenant.includes(query) || landlord.includes(query) || house.includes(query) || ids.includes(query);
     });
   }, [rows, q]);
 
   const badge = (s) => {
     const base = "px-2 py-1 rounded-full text-xs font-semibold";
-    if (s === "paid") return <span className={`${base} bg-emerald-100 text-emerald-700`}>PAID</span>;
+    if (s === "payment_submitted") return <span className={`${base} bg-blue-100 text-blue-700`}>SUBMITTED</span>;
     if (s === "approved") return <span className={`${base} bg-indigo-100 text-indigo-700`}>APPROVED</span>;
     if (s === "transferred") return <span className={`${base} bg-green-100 text-green-700`}>TRANSFERRED</span>;
     if (s === "rejected") return <span className={`${base} bg-red-100 text-red-700`}>REJECTED</span>;
     if (s === "failed") return <span className={`${base} bg-red-100 text-red-700`}>FAILED</span>;
-    if (s === "qr_created") return <span className={`${base} bg-yellow-100 text-yellow-700`}>AWAITING</span>;
     if (s === "expired") return <span className={`${base} bg-gray-200 text-gray-700`}>EXPIRED</span>;
+    if (s === "cancelled") return <span className={`${base} bg-gray-200 text-gray-700`}>CANCELLED</span>;
     return <span className={`${base} bg-gray-100 text-gray-700`}>{String(s).toUpperCase()}</span>;
   };
 
@@ -113,10 +103,24 @@ export const AdminPayments = () => {
     setProcessingId(id);
     try {
       await adminApproveBooking(id, token);
-      showToast("Booking approved", "success");
+      showToast("Booking approved ✅", "success");
       fetchBookings();
     } catch (e) {
       showToast(e.message || "Approve failed", "error");
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const reject = async (id) => {
+    const note = window.prompt("Reject note (optional):") || "";
+    setProcessingId(id);
+    try {
+      await adminRejectBooking(id, note, token);
+      showToast("Booking rejected", "success");
+      fetchBookings();
+    } catch (e) {
+      showToast(e.message || "Reject failed", "error");
     } finally {
       setProcessingId(null);
     }
@@ -137,17 +141,17 @@ export const AdminPayments = () => {
     }
   };
 
-  const markPaid = async (id) => {
-    const utr = window.prompt("Enter UTR / Transaction ID (required):");
+  const markTransferred = async (id) => {
+    const utr = window.prompt("Enter payout UTR / Transaction ID (required):");
     if (!utr) return;
 
     setProcessingId(id);
     try {
       await adminMarkTransferred(id, utr, token);
-      showToast("Marked as transferred", "success");
+      showToast("Marked as transferred ✅", "success");
       fetchBookings();
     } catch (e) {
-      showToast(e.message || "Mark paid failed", "error");
+      showToast(e.message || "Mark transferred failed", "error");
     } finally {
       setProcessingId(null);
     }
@@ -173,7 +177,7 @@ export const AdminPayments = () => {
               </div>
               <div>
                 <h1 className="text-2xl font-bold">Payments</h1>
-                <p className="text-white/80">Approve booking payments and track history</p>
+                <p className="text-white/80">Verify tenant payment proof, approve, and transfer to landlord</p>
               </div>
             </div>
 
@@ -188,7 +192,7 @@ export const AdminPayments = () => {
             </div>
           </div>
 
-          {/* ✅ Tabs */}
+          {/* Tabs */}
           <div className="mt-5 flex flex-wrap gap-2">
             <button
               onClick={() => setTab("pending")}
@@ -226,12 +230,11 @@ export const AdminPayments = () => {
                 <input
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
-                  placeholder="Search tenant/landlord/house/id..."
+                  placeholder="Search tenant/landlord/house/id/utr..."
                   className="w-full pl-9 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
                 />
               </div>
 
-              {/* ✅ Status options depend on tab */}
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
@@ -239,15 +242,14 @@ export const AdminPayments = () => {
               >
                 {tab === "pending" ? (
                   <>
-                    <option value="paid">Paid</option>
-                    <option value="qr_created">Awaiting</option>
+                    <option value="payment_submitted">Payment Submitted</option>
                     <option value="pending">All Pending</option>
                   </>
                 ) : (
                   <>
                     <option value="approved">Approved</option>
                     <option value="transferred">Transferred</option>
-                    <option value="approved">All History</option>
+                    <option value="rejected">Rejected</option>
                   </>
                 )}
               </select>
@@ -269,7 +271,7 @@ export const AdminPayments = () => {
             <div className="flex items-center justify-between">
               <div className="text-lg font-bold text-gray-900 flex items-center gap-2">
                 <CreditCard className="w-5 h-5 text-indigo-600" />
-                {tab === "pending" ? "Pending Payments" : "Payment History"}
+                {tab === "pending" ? "Pending Verifications" : "Payment History"}
               </div>
               <div className="text-sm text-gray-500">{filtered.length} records</div>
             </div>
@@ -280,26 +282,21 @@ export const AdminPayments = () => {
           ) : (
             <div className="divide-y">
               {filtered.map((b) => {
-                const canApprove = tab === "pending" && (b.status === "paid" || b.status === "qr_created");
-                const canPay = tab === "pending" && (b.status === "approved" || b.status === "paid" || b.status === "qr_created");
-                const canMarkPaid = tab === "pending" && b.status === "approved";
+                const canApprove = tab === "pending" && b.status === "payment_submitted";
+                const canReject = tab === "pending" && b.status === "payment_submitted";
+                const canPay = tab === "history" ? false : b.status === "approved"; // pay landlord after approve
+                const canMarkTransferred = tab === "history" ? false : b.status === "approved";
 
-                const upi = b?.landlordId?.upiId;
+                const landlordUpi = b?.landlordId?.upiId;
 
                 return (
                   <div key={b._id} className="p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                    {/* Left info */}
                     <div className="min-w-0">
                       <div className="flex items-center gap-3 flex-wrap">
                         {badge(b.status)}
                         <span className="text-sm text-gray-500">
                           Booking ID: <span className="font-mono">{b._id}</span>
                         </span>
-                        {b.razorpayPaymentId && (
-                          <span className="text-sm text-gray-500">
-                            Payment: <span className="font-mono">{b.razorpayPaymentId}</span>
-                          </span>
-                        )}
                       </div>
 
                       <div className="mt-2 text-gray-900 font-semibold">
@@ -319,31 +316,41 @@ export const AdminPayments = () => {
                         </div>
                         <div>
                           <b>Landlord UPI:</b>{" "}
-                          {upi ? <span className="font-mono">{upi}</span> : <span className="text-red-600 font-semibold">Not set</span>}
+                          {landlordUpi ? (
+                            <span className="font-mono">{landlordUpi}</span>
+                          ) : (
+                            <span className="text-red-600 font-semibold">Not set</span>
+                          )}
                         </div>
 
-                        {/* ✅ show decision details in history */}
-                        {tab === "history" && b?.adminDecision?.approvedAt && (
+                        {/* ✅ tenant proof */}
+                        {b?.tenantUtr && (
                           <div className="sm:col-span-2">
-                            <b>Approved At:</b>{" "}
-                            {new Date(b.adminDecision.approvedAt).toLocaleString("en-IN")}
+                            <b>Tenant UTR:</b> <span className="font-mono">{b.tenantUtr}</span>
                           </div>
                         )}
-                        {tab === "history" && b?.adminDecision?.note && (
+                        {b?.paymentProofUrl && (
                           <div className="sm:col-span-2">
-                            <b>Note:</b> {b.adminDecision.note}
+                            <a
+                              href={b.paymentProofUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-2 text-indigo-600 hover:underline font-semibold"
+                            >
+                              <ImageIcon className="w-4 h-4" />
+                              View Screenshot
+                            </a>
                           </div>
                         )}
 
                         {b.payoutTxnId && (
                           <div className="sm:col-span-2">
-                            <b>UTR:</b> <span className="font-mono">{b.payoutTxnId}</span>
+                            <b>Payout UTR:</b> <span className="font-mono">{b.payoutTxnId}</span>
                           </div>
                         )}
                       </div>
                     </div>
 
-                    {/* Actions (only for Pending tab) */}
                     {tab === "pending" ? (
                       <div className="flex flex-wrap items-center gap-2 justify-end">
                         <button
@@ -351,49 +358,37 @@ export const AdminPayments = () => {
                           disabled={!canApprove || processingId === b._id}
                           className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
                         >
-                          {processingId === b._id ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <BadgeCheck className="w-4 h-4" />
-                          )}
+                          {processingId === b._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <BadgeCheck className="w-4 h-4" />}
                           Approve
                         </button>
 
                         <button
+                          onClick={() => reject(b._id)}
+                          disabled={!canReject || processingId === b._id}
+                          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap items-center gap-2 justify-end">
+                        <button
                           onClick={() => payViaUpi(b._id)}
-                          disabled={!canPay || !upi || processingId === b._id}
+                          disabled={!canPay || !landlordUpi || processingId === b._id}
                           className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
                         >
-                          {processingId === b._id ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <ExternalLink className="w-4 h-4" />
-                          )}
+                          {processingId === b._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
                           Pay via UPI
                         </button>
 
                         <button
-                          onClick={() => markPaid(b._id)}
-                          disabled={!canMarkPaid || processingId === b._id}
+                          onClick={() => markTransferred(b._id)}
+                          disabled={!canMarkTransferred || processingId === b._id}
                           className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
                         >
-                          {processingId === b._id ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Banknote className="w-4 h-4" />
-                          )}
-                          Mark Paid
+                          {processingId === b._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Banknote className="w-4 h-4" />}
+                          Mark Transferred
                         </button>
-                      </div>
-                    ) : (
-                      <div className="text-sm text-gray-500 text-right">
-                        <div className="font-semibold text-gray-700">History Record</div>
-                        <div className="mt-1">
-                          Created: {b?.createdAt ? new Date(b.createdAt).toLocaleString("en-IN") : "-"}
-                        </div>
-                        <div>
-                          Updated: {b?.updatedAt ? new Date(b.updatedAt).toLocaleString("en-IN") : "-"}
-                        </div>
                       </div>
                     )}
                   </div>

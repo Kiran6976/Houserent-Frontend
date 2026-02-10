@@ -23,6 +23,8 @@ import {
   RefreshCw,
   XCircle,
   Ban,
+  UploadCloud,
+  Image as ImageIcon,
 } from "lucide-react";
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -51,6 +53,12 @@ export const HouseDetails = () => {
   const [bookingStatus, setBookingStatus] = useState(null);
   const [checkingStatus, setCheckingStatus] = useState(false);
   const pollRef = useRef(null);
+
+  // ✅ Manual proof state
+  const [utrInput, setUtrInput] = useState("");
+  const [proofUrl, setProofUrl] = useState("");
+  const [uploadingProof, setUploadingProof] = useState(false);
+  const [submittingProof, setSubmittingProof] = useState(false);
 
   // ✅ Visit scheduling modal
   const [showVisitModal, setShowVisitModal] = useState(false);
@@ -128,59 +136,55 @@ export const HouseDetails = () => {
     setShowVisitModal(true);
   };
 
-  // ✅ Submit visit request (Option A)
-  // ✅ Submit visit request (send start/end/message)
-const submitVisitRequest = async (e) => {
-  e.preventDefault();
+  // ✅ Submit visit request
+  const submitVisitRequest = async (e) => {
+    e.preventDefault();
 
-  if (!visitForm.scheduledAt) {
-    showToast("Please select a date & time for the visit.", "error");
-    return;
-  }
+    if (!visitForm.scheduledAt) {
+      showToast("Please select a date & time for the visit.", "error");
+      return;
+    }
 
-  const start = new Date(visitForm.scheduledAt);
-  if (Number.isNaN(start.getTime())) {
-    showToast("Invalid date/time. Please try again.", "error");
-    return;
-  }
+    const start = new Date(visitForm.scheduledAt);
+    if (Number.isNaN(start.getTime())) {
+      showToast("Invalid date/time. Please try again.", "error");
+      return;
+    }
 
-  // ✅ 30 minutes slot
-  const end = new Date(start.getTime() + 30 * 60 * 1000);
+    const end = new Date(start.getTime() + 30 * 60 * 1000);
 
-  // ✅ must be future (at least 30 mins recommended)
-  if (start.getTime() < Date.now() + 5 * 60 * 1000) {
-    showToast("Please choose a time at least 5 minutes from now.", "error");
-    return;
-  }
+    if (start.getTime() < Date.now() + 5 * 60 * 1000) {
+      showToast("Please choose a time at least 5 minutes from now.", "error");
+      return;
+    }
 
-  setVisitLoading(true);
-  try {
-    const res = await fetch(`${API_URL}/api/visits`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        houseId: id,
-        start: start.toISOString(),
-        end: end.toISOString(),
-        message: visitForm.note?.trim() || "",
-      }),
-    });
+    setVisitLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/visits`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          houseId: id,
+          start: start.toISOString(),
+          end: end.toISOString(),
+          message: visitForm.note?.trim() || "",
+        }),
+      });
 
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data?.message || "Failed to schedule visit");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.message || "Failed to schedule visit");
 
-    showToast("Visit request sent ✅ Landlord will approve/reject.", "success");
-    setShowVisitModal(false);
-  } catch (err) {
-    showToast(err.message || "Failed to schedule visit", "error");
-  } finally {
-    setVisitLoading(false);
-  }
-};
-
+      showToast("Visit request sent ✅ Landlord will approve/reject.", "success");
+      setShowVisitModal(false);
+    } catch (err) {
+      showToast(err.message || "Failed to schedule visit", "error");
+    } finally {
+      setVisitLoading(false);
+    }
+  };
 
   const copyText = async (text) => {
     try {
@@ -204,6 +208,12 @@ const submitVisitRequest = async (e) => {
     setActiveBooking(null);
     setPayLoading(false);
     setCheckingStatus(false);
+
+    // reset proof state
+    setUtrInput("");
+    setProofUrl("");
+    setUploadingProof(false);
+    setSubmittingProof(false);
   };
 
   const pollBookingStatus = (bookingId) => {
@@ -222,9 +232,18 @@ const submitVisitRequest = async (e) => {
         const status = data?.status;
         if (status) setBookingStatus(status);
 
+        // ✅ Updated success meaning
+        if (status === "approved") {
+          stopPolling();
+          showToast("Booking approved ✅ You are now confirmed!", "success");
+        }
         if (status === "transferred") {
           stopPolling();
-          showToast("Booking confirmed ✅ Amount transferred!", "success");
+          showToast("Payout transferred ✅ Booking complete!", "success");
+        }
+        if (status === "rejected") {
+          stopPolling();
+          showToast("Booking rejected ❌ Please contact support/admin.", "error");
         }
         if (status === "failed" || status === "expired") {
           stopPolling();
@@ -252,8 +271,10 @@ const submitVisitRequest = async (e) => {
 
       setBookingStatus(data.status || null);
 
-      if (data.status === "transferred") {
-        showToast("Booking confirmed ✅ Amount transferred!", "success");
+      if (data.status === "approved") {
+        showToast("Booking approved ✅", "success");
+      } else if (data.status === "payment_submitted") {
+        showToast("Payment submitted ✅ Admin will verify soon.", "info");
       } else {
         showToast(`Current status: ${data.status}`, "info");
       }
@@ -264,27 +285,72 @@ const submitVisitRequest = async (e) => {
     }
   };
 
-  const markAsPaid = async () => {
+  // ✅ Upload screenshot proof to Cloudinary via your backend
+  const uploadProofImage = async (file) => {
+    if (!file) return;
+    if (!token) {
+      showToast("Please login again", "error");
+      return;
+    }
+
+    setUploadingProof(true);
+    try {
+      const fd = new FormData();
+      fd.append("image", file);
+
+      const res = await fetch(`${API_URL}/api/uploads/image`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: fd,
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.message || "Upload failed");
+
+      if (!data?.url) throw new Error("Upload failed: URL missing");
+      setProofUrl(data.url);
+
+      showToast("Screenshot uploaded ✅", "success");
+    } catch (err) {
+      showToast(err.message || "Upload failed", "error");
+      setProofUrl("");
+    } finally {
+      setUploadingProof(false);
+    }
+  };
+
+  // ✅ Submit proof (UTR required)
+  const submitPaymentProof = async () => {
     if (!payData?.bookingId) return;
 
+    const utr = String(utrInput || "").trim();
+    if (!utr) {
+      showToast("UTR / Transaction ID is required", "error");
+      return;
+    }
+
+    setSubmittingProof(true);
     try {
-      const utr = window.prompt("Enter UTR / Transaction ID (optional):") || "";
       const res = await fetch(`${API_URL}/api/bookings/${payData.bookingId}/mark-paid`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ utr }),
+        body: JSON.stringify({ utr, proofUrl }),
       });
 
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.message || "Failed to mark paid");
+      if (!res.ok) throw new Error(data?.message || "Failed to submit payment proof");
 
-      setBookingStatus("paid");
-      showToast("Marked as PAID ✅ Admin will verify & transfer to landlord.", "success");
+      setBookingStatus("payment_submitted");
+      showToast("Payment proof submitted ✅ Admin will verify soon.", "success");
     } catch (err) {
-      showToast(err.message || "Failed to mark paid", "error");
+      showToast(err.message || "Failed to submit proof", "error");
+    } finally {
+      setSubmittingProof(false);
     }
   };
 
@@ -337,6 +403,10 @@ const submitVisitRequest = async (e) => {
     setActiveBooking(null);
     setBookingStatus(null);
     stopPolling();
+
+    // reset proof inputs
+    setUtrInput("");
+    setProofUrl("");
 
     try {
       const res = await fetch(`${API_URL}/api/bookings/initiate`, {
@@ -419,8 +489,12 @@ const submitVisitRequest = async (e) => {
 
     if (status === "transferred") return <span className={`${base} bg-green-100 text-green-700`}>TRANSFERRED</span>;
     if (status === "approved") return <span className={`${base} bg-indigo-100 text-indigo-700`}>APPROVED</span>;
-    if (status === "paid") return <span className={`${base} bg-blue-100 text-blue-700`}>PAID (ADMIN VERIFY)</span>;
-    if (status === "created") return <span className={`${base} bg-yellow-100 text-yellow-700`}>AWAITING PAYMENT</span>;
+    if (status === "payment_submitted")
+      return <span className={`${base} bg-blue-100 text-blue-700`}>SUBMITTED (VERIFY)</span>;
+    if (status === "paid") return <span className={`${base} bg-blue-100 text-blue-700`}>PAID (LEGACY)</span>;
+    if (status === "initiated" || status === "created")
+      return <span className={`${base} bg-yellow-100 text-yellow-700`}>AWAITING PAYMENT</span>;
+    if (status === "rejected") return <span className={`${base} bg-red-100 text-red-700`}>REJECTED</span>;
     if (status === "failed") return <span className={`${base} bg-red-100 text-red-700`}>FAILED</span>;
     if (status === "expired") return <span className={`${base} bg-gray-200 text-gray-700`}>EXPIRED</span>;
     if (status === "cancelled") return <span className={`${base} bg-gray-200 text-gray-800`}>CANCELLED</span>;
@@ -744,9 +818,7 @@ const submitVisitRequest = async (e) => {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-xl font-bold text-gray-900">Schedule a Visit</h3>
-                <p className="text-sm text-gray-600">
-                  Pick a time. Landlord will approve/reject.
-                </p>
+                <p className="text-sm text-gray-600">Pick a time. Landlord will approve/reject.</p>
               </div>
               <button onClick={() => setShowVisitModal(false)} className="text-gray-500 hover:text-gray-700">
                 ✕
@@ -762,9 +834,7 @@ const submitVisitRequest = async (e) => {
                   onChange={(e) => setVisitForm((p) => ({ ...p, scheduledAt: e.target.value }))}
                   className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 />
-                <p className="mt-2 text-xs text-gray-500">
-                  Tip: Choose a time at least 30–60 mins from now.
-                </p>
+                <p className="mt-2 text-xs text-gray-500">Tip: Choose a time at least 30–60 mins from now.</p>
               </div>
 
               <div>
@@ -799,133 +869,221 @@ const submitVisitRequest = async (e) => {
         </div>
       )}
 
-      {/* Booking Modal */}
-      {showBookingModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-bold text-gray-900">Pay Booking Amount</h3>
-                <p className="text-sm text-gray-600">
-                  Pay ₹{bookingAmount.toLocaleString("en-IN")} to book this property.
-                </p>
-              </div>
-              <button onClick={closeBookingModal} className="text-gray-500 hover:text-gray-700">
-                ✕
-              </button>
-            </div>
+  {/* ✅ Booking Modal (Responsive) */}
+{showBookingModal && (
+  <div className="fixed inset-0 z-50">
+    {/* Backdrop */}
+    <div className="absolute inset-0 bg-black/50" onClick={closeBookingModal} />
 
-            {payLoading ? (
-              <div className="mt-6 flex items-center justify-center">
-                <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
-              </div>
-            ) : activeBooking?.bookingId ? (
-              <div className="mt-5">
-                <div className="rounded-xl border p-4 bg-red-50">
-                  <div className="flex items-start gap-3">
-                    <XCircle className="w-5 h-5 text-red-600 mt-0.5" />
-                    <div>
-                      <div className="font-semibold text-red-700">Active booking already exists</div>
-                      <div className="text-sm text-red-700/90 mt-1">{activeBooking.message}</div>
-                      <div className="text-xs text-gray-600 mt-2">
-                        Booking ID: <b>{activeBooking.bookingId}</b>
-                      </div>
+    {/* Modal wrapper */}
+    <div className="absolute inset-0 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div
+        className="
+          w-full sm:max-w-md
+          bg-white
+          rounded-t-2xl sm:rounded-2xl
+          shadow-2xl
+          max-h-[92vh] sm:max-h-[90vh]
+          overflow-hidden
+        "
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="sticky top-0 z-10 bg-white border-b px-4 sm:px-6 py-4 flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-lg sm:text-xl font-bold text-gray-900">Pay Booking Amount</h3>
+            <p className="text-xs sm:text-sm text-gray-600 mt-1">
+              Pay ₹{bookingAmount.toLocaleString("en-IN")} to book this property.
+            </p>
+          </div>
+
+          <button
+            onClick={closeBookingModal}
+            className="shrink-0 w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-600"
+            aria-label="Close"
+            type="button"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Body (scrollable) */}
+        <div className="px-4 sm:px-6 py-4 overflow-y-auto max-h-[calc(92vh-64px)] sm:max-h-[calc(90vh-72px)]">
+          {payLoading ? (
+            <div className="py-10 flex items-center justify-center">
+              <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
+            </div>
+          ) : activeBooking?.bookingId ? (
+            <div className="mt-2">
+              <div className="rounded-xl border p-4 bg-red-50">
+                <div className="flex items-start gap-3">
+                  <XCircle className="w-5 h-5 text-red-600 mt-0.5" />
+                  <div>
+                    <div className="font-semibold text-red-700">Active booking already exists</div>
+                    <div className="text-sm text-red-700/90 mt-1">{activeBooking.message}</div>
+                    <div className="text-xs text-gray-600 mt-2">
+                      Booking ID: <b>{activeBooking.bookingId}</b>
                     </div>
                   </div>
                 </div>
+              </div>
+
+              <button
+                onClick={cancelBooking}
+                disabled={cancelLoading}
+                className="mt-4 w-full py-3 bg-red-600 text-white rounded-xl font-medium hover:bg-red-700 transition flex items-center justify-center gap-2 disabled:opacity-60"
+                type="button"
+              >
+                {cancelLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Ban className="w-5 h-5" />}
+                {cancelLoading ? "Cancelling..." : "Cancel Booking"}
+              </button>
+
+              <button
+                onClick={closeBookingModal}
+                className="mt-3 w-full py-2.5 border border-gray-200 text-gray-800 rounded-xl hover:bg-gray-50 transition"
+                type="button"
+              >
+                Close
+              </button>
+            </div>
+          ) : payData ? (
+            <div className="mt-2">
+              {/* Summary */}
+              <div className="rounded-xl border p-4 bg-gray-50">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs sm:text-sm text-gray-600">Amount</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      ₹{Number(payData.amount || 0).toLocaleString("en-IN")}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1 break-all">
+                      Pay To: <b>{payData?.payee?.upiId || "UPI"}</b>
+                    </p>
+                  </div>
+
+                  <div className="shrink-0">{statusBadge(bookingStatus)}</div>
+                </div>
+              </div>
+
+              {/* QR */}
+              <div className="mt-4 flex justify-center">
+                <div className="rounded-xl border p-3 bg-white">
+                  <QRCodeCanvas value={payData.upiLink} size={220} />
+                </div>
+              </div>
+
+              {/* ✅ Payment Proof Section */}
+              <div className="mt-4 rounded-xl border p-4 bg-gray-50">
+                <div className="font-semibold text-gray-900">After Payment</div>
+                <p className="text-xs text-gray-600 mt-1">
+                  Enter your UTR/Transaction ID and (optional) upload screenshot.
+                </p>
+
+                <div className="mt-3 space-y-3">
+                  <input
+                    value={utrInput}
+                    onChange={(e) => setUtrInput(e.target.value)}
+                    placeholder="UTR / Transaction ID *"
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <label className="cursor-pointer w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 transition">
+                      <UploadCloud className="w-4 h-4 text-indigo-600" />
+                      <span className="text-sm font-medium">
+                        {uploadingProof ? "Uploading..." : "Upload Screenshot"}
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={uploadingProof}
+                        onChange={(e) => uploadProofImage(e.target.files?.[0])}
+                      />
+                    </label>
+
+                    <button
+                      type="button"
+                      disabled={!proofUrl}
+                      onClick={() => window.open(proofUrl, "_blank")}
+                      className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 transition disabled:opacity-50"
+                    >
+                      <ImageIcon className="w-4 h-4 text-indigo-600" />
+                      View
+                    </button>
+                  </div>
+
+                  {proofUrl ? (
+                    <div className="text-xs text-green-700 font-medium break-all">Uploaded ✅ {proofUrl}</div>
+                  ) : (
+                    <div className="text-xs text-gray-500">Screenshot is optional, but recommended.</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Buttons */}
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button
+                  onClick={() => copyText(payData.upiLink)}
+                  className="w-full py-2.5 border border-indigo-200 text-indigo-700 rounded-xl hover:bg-indigo-50 transition flex items-center justify-center gap-2"
+                  type="button"
+                >
+                  <Copy className="w-4 h-4" />
+                  Copy UPI Link
+                </button>
+
+                <button
+                  onClick={() => (window.location.href = payData.upiLink)}
+                  className="w-full py-2.5 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-700 transition"
+                  type="button"
+                >
+                  Open UPI App
+                </button>
+
+                <button
+                  onClick={submitPaymentProof}
+                  disabled={submittingProof}
+                  className="w-full py-2.5 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition sm:col-span-2 disabled:opacity-60"
+                  type="button"
+                >
+                  {submittingProof ? "Submitting..." : "Submit Payment Proof"}
+                </button>
+
+                <button
+                  onClick={manualCheckStatus}
+                  disabled={checkingStatus}
+                  className="w-full py-2.5 border border-gray-200 text-gray-800 rounded-xl hover:bg-gray-50 transition flex items-center justify-center gap-2 disabled:opacity-60"
+                  type="button"
+                >
+                  <RefreshCw className={`w-4 h-4 ${checkingStatus ? "animate-spin" : ""}`} />
+                  {checkingStatus ? "Checking..." : "Check Status"}
+                </button>
 
                 <button
                   onClick={cancelBooking}
                   disabled={cancelLoading}
-                  className="mt-4 w-full py-3 bg-red-600 text-white rounded-xl font-medium hover:bg-red-700 transition flex items-center justify-center gap-2 disabled:opacity-60"
+                  className="w-full py-2.5 border border-red-200 text-red-700 rounded-xl hover:bg-red-50 transition flex items-center justify-center gap-2 disabled:opacity-60"
+                  type="button"
                 >
-                  {cancelLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Ban className="w-5 h-5" />}
+                  {cancelLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ban className="w-4 h-4" />}
                   {cancelLoading ? "Cancelling..." : "Cancel Booking"}
                 </button>
-
-                <button
-                  onClick={closeBookingModal}
-                  className="mt-3 w-full py-2.5 border border-gray-200 text-gray-800 rounded-lg hover:bg-gray-50 transition"
-                >
-                  Close
-                </button>
               </div>
-            ) : payData ? (
-              <div className="mt-5">
-                <div className="rounded-xl border p-4 bg-gray-50">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600">Amount</p>
-                      <p className="text-2xl font-bold text-gray-900">
-                        ₹{Number(payData.amount || 0).toLocaleString("en-IN")}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Pay To: <b>{payData?.payee?.upiId || "UPI"}</b>
-                      </p>
-                    </div>
-                    {statusBadge(bookingStatus)}
-                  </div>
-                </div>
 
-                <div className="mt-4 flex justify-center">
-                  <div className="rounded-xl border p-3">
-                    <QRCodeCanvas value={payData.upiLink} size={220} />
-                  </div>
-                </div>
-
-                <div className="mt-4 space-y-2">
-                  <button
-                    onClick={() => copyText(payData.upiLink)}
-                    className="w-full py-2.5 border border-indigo-200 text-indigo-700 rounded-lg hover:bg-indigo-50 transition flex items-center justify-center gap-2"
-                  >
-                    <Copy className="w-4 h-4" />
-                    Copy UPI Link
-                  </button>
-
-                  <button
-                    onClick={() => (window.location.href = payData.upiLink)}
-                    className="w-full py-3 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-700 transition"
-                  >
-                    Open UPI App
-                  </button>
-
-                  <button
-                    onClick={markAsPaid}
-                    className="w-full py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition"
-                  >
-                    I Have Paid
-                  </button>
-
-                  <button
-                    onClick={manualCheckStatus}
-                    disabled={checkingStatus}
-                    className="w-full py-2.5 border border-gray-200 text-gray-800 rounded-lg hover:bg-gray-50 transition flex items-center justify-center gap-2 disabled:opacity-60"
-                  >
-                    <RefreshCw className={`w-4 h-4 ${checkingStatus ? "animate-spin" : ""}`} />
-                    {checkingStatus ? "Checking..." : "Check Status"}
-                  </button>
-
-                  <button
-                    onClick={cancelBooking}
-                    disabled={cancelLoading}
-                    className="w-full py-2.5 border border-red-200 text-red-700 rounded-lg hover:bg-red-50 transition flex items-center justify-center gap-2 disabled:opacity-60"
-                    title="Cancel this booking if you don't want to proceed"
-                  >
-                    {cancelLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ban className="w-4 h-4" />}
-                    {cancelLoading ? "Cancelling..." : "Cancel Booking"}
-                  </button>
-                </div>
-
-                <p className="text-xs text-gray-500 mt-3">
-                  Booking ID: <b>{payData.bookingId}</b>
-                </p>
-              </div>
-            ) : (
-              <p className="mt-4 text-sm text-red-600">Payment details not available.</p>
-            )}
-          </div>
+              <p className="text-xs text-gray-500 mt-3 break-all">
+                Booking ID: <b>{payData.bookingId}</b>
+              </p>
+            </div>
+          ) : (
+            <p className="mt-2 text-sm text-red-600">Payment details not available.</p>
+          )}
         </div>
-      )}
+      </div>
+    </div>
+  </div>
+)}
+
+
     </div>
   );
 };

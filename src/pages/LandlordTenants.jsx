@@ -65,29 +65,41 @@ export const LandlordTenants = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-6 md:p-8 text-white mb-8">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
-                <Users className="w-8 h-8" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold">Users / Tenants</h1>
-                <p className="text-white/80">See which tenant owns which house</p>
-                <p className="text-white/80 text-sm mt-1">{total} active tenants</p>
-              </div>
-            </div>
+       {/* Header */}
+<div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-6 md:p-8 text-white mb-8">
+  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
+    
+    {/* LEFT SIDE */}
+    <div className="flex items-center gap-4">
+      <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
+        <Users className="w-8 h-8" />
+      </div>
+      <div>
+        <h1 className="text-2xl font-bold">Users / Tenants</h1>
+        <p className="text-white/80">See which tenant owns which house</p>
+        <p className="text-white/80 text-sm mt-1">{total} active tenants</p>
+      </div>
+    </div>
 
-            <Link
-              to="/landlord/dashboard"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/15 hover:bg-white/20 border border-white/20 transition"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back
-            </Link>
-          </div>
-        </div>
+    {/* RIGHT SIDE ACTIONS */}
+    <div className="flex items-center gap-3">
+      <Link
+        to="/landlord/dashboard"
+        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/15 hover:bg-white/20 border border-white/20 transition"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Back
+      </Link>
+
+      <Link
+        to="/landlord/rent-payments"
+        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/15 hover:bg-white/20 border border-white/20 transition"
+      >
+        Rent Payments
+      </Link>
+    </div>
+  </div>
+</div>
 
         {rows.length === 0 ? (
           <div className="bg-white rounded-2xl p-12 text-center">

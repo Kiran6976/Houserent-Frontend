@@ -18,6 +18,8 @@ import { RefundPolicy } from "./pages/RefundPolicy";
 import { MyRents } from "./pages/MyRents";
 import { MyVisits } from "./pages/MyVisits";
 import { VisitRequests } from "./pages/VisitRequests";
+import { TenantPayments } from "./pages/TenantPayments";
+import { LandlordRentPayments } from "./pages/LandlordRentPayments";
 
 // Admin Pages
 import { AdminLogin } from "./pages/AdminLogin";
@@ -49,7 +51,8 @@ export function App() {
               <Route path="/terms" element={<Terms />} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/refund-policy" element={<RefundPolicy />} />
-              
+              <Route path="/tenant/payments/:houseId" element={<TenantPayments />} />
+
 
 
               {/* Admin Routes */}
@@ -88,6 +91,15 @@ export function App() {
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/landlord/rent-payments"
+                element={
+                  <ProtectedRoute requiredRole="landlord" requireVerifiedLandlord>
+                    <LandlordRentPayments />
+                  </ProtectedRoute>
+                }
+              />
+
 
               {/* ✅ FIX: Use requiredRole here too (you were using role="landlord") */}
               <Route

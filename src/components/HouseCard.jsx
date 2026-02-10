@@ -2,25 +2,19 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { MapPin, Bed, Bath, Square, Home } from "lucide-react";
 
-export const HouseCard = ({ house, showActions, onEdit, onDelete }) => {
-  // ✅ Support MongoDB (_id) + old mockDb (id)
+export const HouseCard = ({ house, showActions, onEdit, onDelete, ctaLabel, ctaTo }) => {
   const hid = house?._id || house?.id;
 
-  const typeIcons = {
-    apartment: "🏢",
-    room: "🚪",
-    house: "🏠",
-  };
-
-  const furnishedLabels = {
-    unfurnished: "Unfurnished",
-    semi: "Semi-Furnished",
-    fully: "Fully Furnished",
-  };
+  const typeIcons = { apartment: "🏢", room: "🚪", house: "🏠" };
+  const furnishedLabels = { unfurnished: "Unfurnished", semi: "Semi-Furnished", fully: "Fully Furnished" };
 
   const image0 =
     (Array.isArray(house?.images) && house.images[0]) ||
     "https://via.placeholder.com/400x300?text=No+Image";
+
+  // ✅ default CTA (keeps Browse page same)
+  const finalCtaTo = ctaTo || `/house/${hid}`;
+  const finalCtaLabel = ctaLabel || "View Details";
 
   return (
     <div className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow group">
@@ -34,9 +28,7 @@ export const HouseCard = ({ house, showActions, onEdit, onDelete }) => {
         <div className="absolute top-3 left-3">
           <span className="bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1">
             {typeIcons[house?.type] || "🏠"}{" "}
-            {house?.type
-              ? house.type.charAt(0).toUpperCase() + house.type.slice(1)
-              : "Property"}
+            {house?.type ? house.type.charAt(0).toUpperCase() + house.type.slice(1) : "Property"}
           </span>
         </div>
 
@@ -92,10 +84,7 @@ export const HouseCard = ({ house, showActions, onEdit, onDelete }) => {
 
           {showActions ? (
             <div className="flex gap-2">
-              <Link
-                to={`/house/${hid}`}
-                className="px-3 py-1.5 text-sm text-indigo-600 hover:bg-indigo-50 rounded-lg transition"
-              >
+              <Link to={`/house/${hid}`} className="px-3 py-1.5 text-sm text-indigo-600 hover:bg-indigo-50 rounded-lg transition">
                 View
               </Link>
 
@@ -115,11 +104,11 @@ export const HouseCard = ({ house, showActions, onEdit, onDelete }) => {
             </div>
           ) : (
             <Link
-              to={`/house/${hid}`}
+              to={finalCtaTo}
               className="flex items-center gap-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm font-medium"
             >
               <Home className="w-4 h-4" />
-              View Details
+              {finalCtaLabel}
             </Link>
           )}
         </div>
