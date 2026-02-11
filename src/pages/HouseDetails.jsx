@@ -1014,7 +1014,7 @@ export const HouseDetails = () => {
                   </div>
 
                   {proofUrl ? (
-                    <div className="text-xs text-green-700 font-medium break-all">Uploaded ✅ {proofUrl}</div>
+                    <div className="text-xs text-green-700 font-medium">Screenshot uploaded ✅</div>
                   ) : (
                     <div className="text-xs text-gray-500">Screenshot is optional, but recommended.</div>
                   )}
