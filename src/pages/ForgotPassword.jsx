@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Mail, Loader2, Building2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
@@ -7,6 +7,7 @@ import { useToast } from "../context/ToastContext";
 export const ForgotPassword = () => {
   const { forgotPassword } = useAuth();
   const { showToast } = useToast();
+  const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
   const [err, setErr] = useState("");
@@ -32,9 +33,11 @@ export const ForgotPassword = () => {
     try {
       const res = await forgotPassword(email.trim());
       if (res.success) {
-        showToast(res.message || "Reset link sent (if account exists).", "success");
+        showToast(res.message || "OTP sent (if account exists).", "success");
+        // ✅ Move user to reset page and carry email
+        navigate("/reset-password", { state: { email: email.trim() } });
       } else {
-        showToast(res.message || "Failed to send reset link", "error");
+        showToast(res.message || "Failed to send OTP", "error");
       }
     } catch {
       showToast("Something went wrong. Please try again.", "error");
@@ -52,7 +55,7 @@ export const ForgotPassword = () => {
             <span>HomeRent</span>
           </Link>
           <h1 className="mt-6 text-3xl font-bold text-gray-900">Forgot password</h1>
-          <p className="mt-2 text-gray-600">We’ll send a reset link to your email.</p>
+          <p className="mt-2 text-gray-600">We’ll send a reset OTP to your email.</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-8">
@@ -88,7 +91,7 @@ export const ForgotPassword = () => {
                   Sending...
                 </>
               ) : (
-                "Send reset link"
+                "Send OTP"
               )}
             </button>
 

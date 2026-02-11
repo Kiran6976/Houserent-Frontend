@@ -9,6 +9,8 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { HomePage } from "./pages/Home";
 import { Register } from "./pages/Register";
 import { Login } from "./pages/Login";
+import { ForgotPassword } from "./pages/ForgotPassword";
+import { ResetPassword } from "./pages/ResetPassword";
 import { TenantHouses } from "./pages/TenantHouses";
 import { HouseDetails } from "./pages/HouseDetails";
 import { NotFound } from "./pages/NotFound";
@@ -20,8 +22,6 @@ import { MyVisits } from "./pages/MyVisits";
 import { VisitRequests } from "./pages/VisitRequests";
 import { TenantPayments } from "./pages/TenantPayments";
 import { LandlordRentPayments } from "./pages/LandlordRentPayments";
-import { ForgotPassword } from "./pages/ForgotPassword";
-import { ResetPassword } from "./pages/ResetPassword";
 
 // Admin Pages
 import { AdminLogin } from "./pages/AdminLogin";
@@ -35,7 +35,6 @@ import { AddHouse } from "./pages/AddHouse";
 import { LandlordUpi } from "./pages/LandlordUpi";
 import { LandlordTenants } from "./pages/LandlordTenants";
 
-
 export function App() {
   return (
     <Router>
@@ -48,16 +47,17 @@ export function App() {
               <Route path="/" element={<HomePage />} />
               <Route path="/register" element={<Register />} />
               <Route path="/login" element={<Login />} />
+
+              {/* ✅ Password reset via OTP */}
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+
               <Route path="/tenant/houses" element={<TenantHouses />} />
               <Route path="/house/:id" element={<HouseDetails />} />
               <Route path="/terms" element={<Terms />} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/refund-policy" element={<RefundPolicy />} />
               <Route path="/tenant/payments/:houseId" element={<TenantPayments />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              <Route path="/reset-password/:token" element={<ResetPassword />} />
-
-
 
               {/* Admin Routes */}
               <Route path="/admin" element={<AdminLogin />} />
@@ -86,7 +86,7 @@ export function App() {
                 }
               />
 
-              {/* Landlord Protected Routes (require verified) */}
+              {/* Landlord Protected Routes */}
               <Route
                 path="/landlord/dashboard"
                 element={
@@ -104,8 +104,6 @@ export function App() {
                 }
               />
 
-
-              {/* ✅ FIX: Use requiredRole here too (you were using role="landlord") */}
               <Route
                 path="/landlord/payment"
                 element={
@@ -150,23 +148,22 @@ export function App() {
               />
 
               <Route
-              path="/tenant/my-visits"
-              element={
-                <ProtectedRoute requiredRole="tenant">
-                  <MyVisits />
-                </ProtectedRoute>
-              }
-            />
+                path="/tenant/my-visits"
+                element={
+                  <ProtectedRoute requiredRole="tenant">
+                    <MyVisits />
+                  </ProtectedRoute>
+                }
+              />
 
-            <Route
-              path="/landlord/visit-requests"
-              element={
-                <ProtectedRoute requiredRole="landlord" requireVerifiedLandlord>
-                  <VisitRequests />
-                </ProtectedRoute>
-              }
-            />
-
+              <Route
+                path="/landlord/visit-requests"
+                element={
+                  <ProtectedRoute requiredRole="landlord" requireVerifiedLandlord>
+                    <VisitRequests />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* 404 */}
               <Route path="*" element={<NotFound />} />

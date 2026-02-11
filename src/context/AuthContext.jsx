@@ -176,57 +176,39 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // ✅ NEW: Forgot Password (send reset link)
+  // ✅ Forgot Password (send OTP)
   const forgotPassword = async (email) => {
     try {
-      const { ok, data } = await request("/api/auth/forgot-password", {
+      const { ok, data } = await request("/api/auth/forgot-password-otp", {
         method: "POST",
         body: JSON.stringify({ email }),
       });
 
       if (!ok) {
-        return {
-          success: false,
-          message: data?.message || "Failed to send reset link",
-        };
+        return { success: false, message: data?.message || "Failed to send OTP" };
       }
 
-      return {
-        success: true,
-        message: data?.message || "If the email exists, a reset link has been sent.",
-      };
-    } catch (err) {
-      return {
-        success: false,
-        message: "Network error. Please try again.",
-      };
+      return { success: true, message: data?.message || "OTP sent (if account exists)." };
+    } catch {
+      return { success: false, message: "Network error. Please try again." };
     }
   };
 
-  // ✅ NEW: Reset Password (token from URL)
-  const resetPassword = async ({ token: resetToken, password }) => {
+  // ✅ Reset Password (verify OTP)
+  const resetPassword = async ({ email, otp, password }) => {
     try {
-      const { ok, data } = await request(`/api/auth/reset-password/${resetToken}`, {
+      const { ok, data } = await request("/api/auth/reset-password-otp", {
         method: "POST",
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ email, otp, password }),
       });
 
       if (!ok) {
-        return {
-          success: false,
-          message: data?.message || "Failed to reset password",
-        };
+        return { success: false, message: data?.message || "Failed to reset password" };
       }
 
-      return {
-        success: true,
-        message: data?.message || "Password updated successfully. Please login.",
-      };
-    } catch (err) {
-      return {
-        success: false,
-        message: "Network error. Please try again.",
-      };
+      return { success: true, message: data?.message || "Password updated. Please login." };
+    } catch {
+      return { success: false, message: "Network error. Please try again." };
     }
   };
 
@@ -263,7 +245,6 @@ export const AuthProvider = ({ children }) => {
       verifyEmailOtp,
       resendOtp,
 
-      // ✅ NEW
       forgotPassword,
       resetPassword,
 
