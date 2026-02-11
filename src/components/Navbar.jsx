@@ -25,15 +25,6 @@ export const Navbar = () => {
     navigate("/login");
   };
 
-  const AdminLink = () => (
-    <Link
-      to={isAuthenticated && user?.role === "admin" ? "/admin/dashboard" : "/admin"}
-      className="text-gray-700 hover:text-indigo-600 transition"
-    >
-      Admin
-    </Link>
-  );
-
   return (
     <nav className="bg-white shadow-md sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -67,7 +58,6 @@ export const Navbar = () => {
                       Add House
                     </Link>
 
-                    {/* ✅ NEW: Visit Requests */}
                     <Link
                       to="/landlord/visit-requests"
                       className="flex items-center gap-1 text-gray-700 hover:text-indigo-600 transition"
@@ -86,7 +76,6 @@ export const Navbar = () => {
                       Browse Houses
                     </Link>
 
-                    {/* ✅ My Rents */}
                     <Link
                       to="/tenant/my-rents"
                       className="flex items-center gap-1 text-gray-700 hover:text-indigo-600 transition"
@@ -95,7 +84,6 @@ export const Navbar = () => {
                       My Rents
                     </Link>
 
-                    {/* ✅ NEW: My Visits */}
                     <Link
                       to="/tenant/my-visits"
                       className="flex items-center gap-1 text-gray-700 hover:text-indigo-600 transition"
@@ -105,8 +93,9 @@ export const Navbar = () => {
                     </Link>
                   </>
                 ) : (
-                  <Link to="/admin/dashboard" className="text-gray-700 hover:text-indigo-600 transition">
-                    Admin
+                  // ✅ Admin logged in: we keep navbar clean; no Admin link here
+                  <Link to="/" className="text-gray-700 hover:text-indigo-600 transition">
+                    Home
                   </Link>
                 )}
 
@@ -131,7 +120,7 @@ export const Navbar = () => {
               </>
             ) : (
               <>
-                <AdminLink />
+                {/* ✅ Removed Admin from navbar */}
                 <Link to="/login" className="text-gray-700 hover:text-indigo-600 transition">
                   Login
                 </Link>
@@ -187,8 +176,6 @@ export const Navbar = () => {
                     >
                       Add House
                     </Link>
-
-                    {/* ✅ NEW: Visit Requests */}
                     <Link
                       to="/landlord/visit-requests"
                       onClick={closeMobile}
@@ -206,8 +193,6 @@ export const Navbar = () => {
                     >
                       Browse Houses
                     </Link>
-
-                    {/* ✅ My Rents */}
                     <Link
                       to="/tenant/my-rents"
                       onClick={closeMobile}
@@ -215,8 +200,6 @@ export const Navbar = () => {
                     >
                       My Rents
                     </Link>
-
-                    {/* ✅ NEW: My Visits */}
                     <Link
                       to="/tenant/my-visits"
                       onClick={closeMobile}
@@ -226,8 +209,9 @@ export const Navbar = () => {
                     </Link>
                   </>
                 ) : (
-                  <Link to="/admin/dashboard" onClick={closeMobile} className="block text-gray-700 hover:text-indigo-600">
-                    Admin
+                  // ✅ Admin logged in: no admin link in navbar
+                  <Link to="/" onClick={closeMobile} className="block text-gray-700 hover:text-indigo-600">
+                    Home
                   </Link>
                 )}
 
@@ -244,7 +228,7 @@ export const Navbar = () => {
               </>
             ) : (
               <>
-                <AdminLink />
+                {/* ✅ Removed Admin from navbar */}
                 <Link
                   to="/login"
                   onClick={closeMobile}
