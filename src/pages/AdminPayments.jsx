@@ -1,7 +1,9 @@
+// src/pages/AdminPayments.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
+import { QRCodeCanvas } from "qrcode.react";
 import {
   ArrowLeft,
   BadgeCheck,
@@ -15,6 +17,9 @@ import {
   Shield,
   History,
   Image as ImageIcon,
+  Copy,
+  X,
+  QrCode,
 } from "lucide-react";
 import {
   adminGetBookings,
@@ -36,6 +41,11 @@ export const AdminPayments = () => {
   const [tab, setTab] = useState("pending"); // pending | history
   const [status, setStatus] = useState("payment_submitted");
   const [q, setQ] = useState("");
+
+  // ✅ UPI Modal State (QR + intent)
+  const [upiOpen, setUpiOpen] = useState(false);
+  const [upiData, setUpiData] = useState(null); // { intent, amount, payee, bookingId, note }
+  const [upiLoading, setUpiLoading] = useState(false);
 
   useEffect(() => {
     if (tab === "pending") setStatus("payment_submitted");
@@ -126,19 +136,47 @@ export const AdminPayments = () => {
     }
   };
 
-  const payViaUpi = async (id) => {
-    setProcessingId(id);
+  const isMobile = () => {
+    const ua = navigator.userAgent || "";
+    return /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
+  };
+
+  const copyText = async (text) => {
     try {
-      const data = await adminGetUpiIntent(id, token);
+      await navigator.clipboard.writeText(String(text || ""));
+      showToast("Copied ✅", "success");
+    } catch {
+      showToast("Copy failed", "error");
+    }
+  };
+
+  // ✅ Open QR modal + optionally open UPI app on mobile
+  const openUpiModal = async (bookingId) => {
+    setProcessingId(bookingId);
+    setUpiLoading(true);
+    try {
+      const data = await adminGetUpiIntent(bookingId, token);
       if (!data?.intent) throw new Error(data?.message || "UPI intent not available");
 
-      window.location.href = data.intent;
-      showToast("Opening UPI app…", "success");
+      setUpiData(data);
+      setUpiOpen(true);
+
+      // If admin is on mobile, try opening the UPI app directly too
+      if (isMobile()) {
+        window.location.href = data.intent;
+      }
     } catch (e) {
       showToast(e.message || "UPI open failed", "error");
     } finally {
+      setUpiLoading(false);
       setProcessingId(null);
     }
+  };
+
+  const closeUpiModal = () => {
+    setUpiOpen(false);
+    setUpiData(null);
+    setUpiLoading(false);
   };
 
   const markTransferred = async (id) => {
@@ -225,7 +263,7 @@ export const AdminPayments = () => {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-              <div className="relative w-full sm:w-[280px]">
+              <div className="relative w-full sm:w-[320px]">
                 <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   value={q}
@@ -282,12 +320,14 @@ export const AdminPayments = () => {
           ) : (
             <div className="divide-y">
               {filtered.map((b) => {
+                const landlordUpi = b?.landlordId?.upiId;
+
                 const canApprove = tab === "pending" && b.status === "payment_submitted";
                 const canReject = tab === "pending" && b.status === "payment_submitted";
-                const canPay = tab === "history" ? false : b.status === "approved"; // pay landlord after approve
-                const canMarkTransferred = tab === "history" ? false : b.status === "approved";
 
-                const landlordUpi = b?.landlordId?.upiId;
+                // ✅ FIX: Pay + Mark transferred only in HISTORY and only when APPROVED
+                const canPay = tab === "history" && b.status === "approved";
+                const canMarkTransferred = tab === "history" && b.status === "approved";
 
                 return (
                   <div key={b._id} className="p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -312,7 +352,7 @@ export const AdminPayments = () => {
                           <b>Landlord:</b> {b?.landlordId?.name} ({b?.landlordId?.email})
                         </div>
                         <div>
-                          <b>Amount:</b> ₹{b.amount}
+                          <b>Amount:</b> ₹{Number(b.amount || 0)}
                         </div>
                         <div>
                           <b>Landlord UPI:</b>{" "}
@@ -323,12 +363,12 @@ export const AdminPayments = () => {
                           )}
                         </div>
 
-                        {/* ✅ tenant proof */}
                         {b?.tenantUtr && (
                           <div className="sm:col-span-2">
                             <b>Tenant UTR:</b> <span className="font-mono">{b.tenantUtr}</span>
                           </div>
                         )}
+
                         {b?.paymentProofUrl && (
                           <div className="sm:col-span-2">
                             <a
@@ -358,7 +398,11 @@ export const AdminPayments = () => {
                           disabled={!canApprove || processingId === b._id}
                           className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
                         >
-                          {processingId === b._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <BadgeCheck className="w-4 h-4" />}
+                          {processingId === b._id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <BadgeCheck className="w-4 h-4" />
+                          )}
                           Approve
                         </button>
 
@@ -372,13 +416,18 @@ export const AdminPayments = () => {
                       </div>
                     ) : (
                       <div className="flex flex-wrap items-center gap-2 justify-end">
+                        {/* ✅ Pay UPI (opens QR modal + UPI intent) */}
                         <button
-                          onClick={() => payViaUpi(b._id)}
-                          disabled={!canPay || !landlordUpi || processingId === b._id}
+                          onClick={() => openUpiModal(b._id)}
+                          disabled={!canPay || !landlordUpi || processingId === b._id || upiLoading}
                           className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
                         >
-                          {processingId === b._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
-                          Pay via UPI
+                          {processingId === b._id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <QrCode className="w-4 h-4" />
+                          )}
+                          Pay UPI / QR
                         </button>
 
                         <button
@@ -386,7 +435,11 @@ export const AdminPayments = () => {
                           disabled={!canMarkTransferred || processingId === b._id}
                           className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
                         >
-                          {processingId === b._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Banknote className="w-4 h-4" />}
+                          {processingId === b._id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Banknote className="w-4 h-4" />
+                          )}
                           Mark Transferred
                         </button>
                       </div>
@@ -400,6 +453,128 @@ export const AdminPayments = () => {
 
         <div className="h-6" />
       </div>
+
+      {/* ✅ UPI / QR Modal */}
+     {/* ✅ UPI / QR Modal (FULL UPDATED - SCROLLABLE) */}
+{upiOpen && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    {/* Overlay */}
+    <div className="absolute inset-0 bg-black/50" onClick={closeUpiModal} />
+
+    {/* Modal Container */}
+    <div
+      className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl flex flex-col max-h-[90vh]"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {/* Header */}
+      <div className="sticky top-0 z-10 bg-white border-b px-4 sm:px-6 py-4 flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-lg sm:text-xl font-bold text-gray-900">Pay Landlord via UPI</h3>
+          <p className="text-xs sm:text-sm text-gray-600 mt-1">
+            {upiData?.note || "Scan QR or open UPI app to pay landlord"}
+          </p>
+        </div>
+
+        <button
+          onClick={closeUpiModal}
+          className="shrink-0 w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-600"
+          aria-label="Close"
+          type="button"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* Body (✅ scrolls) */}
+      <div className="px-4 sm:px-6 py-4 overflow-y-auto overscroll-contain">
+        {!upiData?.intent ? (
+          <div className="py-10 flex items-center justify-center">
+            <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
+          </div>
+        ) : (
+          <>
+            <div className="rounded-xl border p-4 bg-gray-50">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-xs text-gray-500">Payee</div>
+                  <div className="font-semibold text-gray-900">{upiData?.payee?.name || "Landlord"}</div>
+                  <div className="text-xs text-gray-600 mt-1 break-all">
+                    UPI: <span className="font-mono font-semibold">{upiData?.payee?.upiId}</span>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <div className="text-xs text-gray-500">Amount</div>
+                  <div className="text-2xl font-bold text-gray-900">
+                    ₹{Number(upiData?.amount || 0).toLocaleString("en-IN")}
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-xs text-gray-500 mt-3 break-all">
+                Booking ID: <span className="font-mono">{upiData?.bookingId}</span>
+              </div>
+            </div>
+
+            {/* QR */}
+            <div className="mt-4 flex justify-center">
+              <div className="rounded-xl border p-3 bg-white">
+                <QRCodeCanvas value={upiData.intent} size={240} />
+              </div>
+            </div>
+
+            <p className="mt-3 text-xs text-gray-600 text-center">
+              Tip: If you are on laptop, scan this QR using your phone’s UPI app.
+            </p>
+
+            {/* Actions */}
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button
+                onClick={() => (window.location.href = upiData.intent)}
+                className="w-full py-2.5 bg-purple-600 text-white rounded-xl font-medium hover:bg-purple-700 transition flex items-center justify-center gap-2"
+                type="button"
+              >
+                <ExternalLink className="w-4 h-4" />
+                Open UPI App
+              </button>
+
+              <button
+                onClick={() => copyText(upiData.intent)}
+                className="w-full py-2.5 border border-purple-200 text-purple-700 rounded-xl hover:bg-purple-50 transition flex items-center justify-center gap-2"
+                type="button"
+              >
+                <Copy className="w-4 h-4" />
+                Copy UPI Link
+              </button>
+
+              <button
+                onClick={() => copyText(upiData?.payee?.upiId)}
+                className="w-full py-2.5 border border-gray-200 text-gray-800 rounded-xl hover:bg-gray-50 transition flex items-center justify-center gap-2"
+                type="button"
+              >
+                <Copy className="w-4 h-4" />
+                Copy UPI ID
+              </button>
+
+              <button
+                onClick={closeUpiModal}
+                className="w-full py-2.5 border border-gray-200 text-gray-800 rounded-xl hover:bg-gray-50 transition"
+                type="button"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="mt-4 text-xs text-gray-500">
+              After paying, go back and click <b>Mark Transferred</b> to enter payout UTR.
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  </div>
+)}
+
     </div>
   );
 };
