@@ -4,6 +4,7 @@ import { AuthProvider } from "./context/AuthContext";
 import { ToastProvider } from "./context/ToastContext";
 import { Navbar } from "./components/Navbar";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { SupportFab } from "./components/SupportFab";
 
 // Pages
 import { HomePage } from "./pages/Home";
@@ -24,12 +25,14 @@ import { TenantPayments } from "./pages/TenantPayments";
 import { LandlordRentPayments } from "./pages/LandlordRentPayments";
 import { LandlordPayouts } from "./pages/LandlordPayouts";
 import { Support } from "./pages/Support";
+
 // Admin Pages
 import { AdminLogin } from "./pages/AdminLogin";
 import { AdminDashboard } from "./pages/AdminDashboard";
 import { AdminHouses } from "./pages/AdminHouses";
 import { AdminPayments } from "./pages/AdminPayments";
 import { AdminSupport } from "./pages/AdminSupport";
+
 // Landlord Pages
 import { LandlordDashboard } from "./pages/LandlordDashboard";
 import { AddHouse } from "./pages/AddHouse";
@@ -43,6 +46,7 @@ export function App() {
         <ToastProvider>
           <div className="min-h-screen bg-gray-50">
             <Navbar />
+
             <Routes>
               {/* Public Routes */}
               <Route path="/" element={<HomePage />} />
@@ -60,10 +64,20 @@ export function App() {
               <Route path="/refund-policy" element={<RefundPolicy />} />
               <Route path="/tenant/payments/:houseId" element={<TenantPayments />} />
               <Route path="/landlord/payouts" element={<LandlordPayouts />} />
-              <Route path="/support" element={<Support />} />
+
+              {/* ✅ Support (tenant/landlord only) */}
+              <Route
+                path="/support"
+                element={
+                  <ProtectedRoute>
+                    <Support />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Admin Routes */}
               <Route path="/admin" element={<AdminLogin />} />
+
               <Route
                 path="/admin/dashboard"
                 element={
@@ -72,6 +86,7 @@ export function App() {
                   </ProtectedRoute>
                 }
               />
+
               <Route
                 path="/admin/support"
                 element={
@@ -80,6 +95,7 @@ export function App() {
                   </ProtectedRoute>
                 }
               />
+
               <Route
                 path="/admin/houses"
                 element={
@@ -88,6 +104,7 @@ export function App() {
                   </ProtectedRoute>
                 }
               />
+
               <Route
                 path="/admin/payments"
                 element={
@@ -106,6 +123,7 @@ export function App() {
                   </ProtectedRoute>
                 }
               />
+
               <Route
                 path="/landlord/rent-payments"
                 element={
@@ -132,6 +150,7 @@ export function App() {
                   </ProtectedRoute>
                 }
               />
+
               <Route
                 path="/landlord/edit-house/:id"
                 element={
@@ -140,6 +159,7 @@ export function App() {
                   </ProtectedRoute>
                 }
               />
+
               <Route
                 path="/landlord/tenants"
                 element={
@@ -179,9 +199,13 @@ export function App() {
               {/* 404 */}
               <Route path="*" element={<NotFound />} />
             </Routes>
+
+            {/* ✅ Floating Support icon/button on all pages */}
+            <SupportFab />
           </div>
         </ToastProvider>
       </AuthProvider>
     </Router>
   );
 }
+ 

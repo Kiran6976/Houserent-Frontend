@@ -73,7 +73,7 @@ export const Support = () => {
 
   const [attach, setAttach] = useState(null); // File
   const [attachUploading, setAttachUploading] = useState(false);
-  const [attachMeta, setAttachMeta] = useState(null); // { url, type }
+  const [attachMeta, setAttachMeta] = useState(null); // { url, type, name }
 
   const fileRef = useRef(null);
   const bottomRef = useRef(null);
@@ -89,14 +89,27 @@ export const Support = () => {
     [user]
   );
 
+  // ✅ If any ticket exists (backend hides closed), treat it as active
+  const hasActiveTicket = useMemo(() => {
+    return Array.isArray(tickets) && tickets.length > 0;
+  }, [tickets]);
+
   const loadTickets = async () => {
     try {
       setLoading(true);
       const data = await getMySupportTickets(token);
-      setTickets(data?.tickets || []);
-      // auto select first
-      if (!selectedId && data?.tickets?.length) {
-        setSelectedId(data.tickets[0]._id);
+      const list = data?.tickets || [];
+      setTickets(list);
+
+      // ✅ If selectedId no longer exists (e.g. admin closed -> backend hides), clear selection
+      if (selectedId && !list.some((t) => t._id === selectedId)) {
+        setSelectedId(null);
+        setDetail(null);
+      }
+
+      // ✅ Auto select first ticket if none selected
+      if (!selectedId && list.length) {
+        setSelectedId(list[0]._id);
       }
     } catch (e) {
       showToast(e.message || "Failed to load tickets", "error");
@@ -111,9 +124,14 @@ export const Support = () => {
       setThreadLoading(true);
       const data = await getSupportTicketDetail(ticketId, token);
       setDetail(data);
-      // scroll down after load
       setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
     } catch (e) {
+      // ✅ If ticket became hidden (closed) while viewing, refresh list
+      const msg = String(e?.message || "").toLowerCase();
+      if (msg.includes("not found")) {
+        await loadTickets();
+        return;
+      }
       showToast(e.message || "Failed to load ticket", "error");
     } finally {
       setThreadLoading(false);
@@ -160,6 +178,14 @@ export const Support = () => {
 
   const createTicket = async (e) => {
     e.preventDefault();
+
+    // ✅ UI block: only 1 active ticket allowed
+    if (hasActiveTicket) {
+      showToast("You already have an active ticket. Please use the chat.", "info");
+      if (tickets?.[0]?._id) setSelectedId(tickets[0]._id);
+      return;
+    }
+
     if (!subject.trim() || !description.trim()) {
       showToast("Subject and issue details are required", "error");
       return;
@@ -189,6 +215,13 @@ export const Support = () => {
 
       await loadTickets();
     } catch (err) {
+      // ✅ Backend block (race condition): open existing active ticket
+      if (err?.statusCode === 409 && err?.data?.activeTicketId) {
+        showToast("You already have an active ticket. Opening it.", "info");
+        await loadTickets();
+        setSelectedId(err.data.activeTicketId);
+        return;
+      }
       showToast(err.message || "Failed to create ticket", "error");
     } finally {
       setCreating(false);
@@ -221,6 +254,13 @@ export const Support = () => {
       await loadTickets();
       setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
     } catch (err) {
+      // If ticket got closed and backend blocks messages, refresh
+      const msg = String(err?.message || "").toLowerCase();
+      if (msg.includes("closed") || msg.includes("not found")) {
+        showToast("This ticket was closed by admin.", "info");
+        await loadTickets();
+        return;
+      }
       showToast(err.message || "Failed to send message", "error");
     } finally {
       setSending(false);
@@ -272,29 +312,45 @@ export const Support = () => {
                     Create a Support Ticket
                   </div>
                   <div className="text-xs text-gray-500">
-                    Logged in as <span className="font-semibold capitalize">{prefill.role}</span>
+                    Logged in as{" "}
+                    <span className="font-semibold capitalize">{prefill.role}</span>
                   </div>
                 </div>
               </div>
 
               <form onSubmit={createTicket} className="p-5 space-y-4">
+                {/* ✅ Banner */}
+                {hasActiveTicket && (
+                  <div className="rounded-xl border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-900">
+                    You already have an active support ticket. You can create a new ticket only after the admin closes the current one.
+                  </div>
+                )}
+
                 {/* Prefilled */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="rounded-xl bg-gray-50 border border-gray-200 p-3">
                     <div className="text-xs text-gray-500">Name</div>
-                    <div className="text-sm font-semibold text-gray-900">{prefill.name || "—"}</div>
+                    <div className="text-sm font-semibold text-gray-900">
+                      {prefill.name || "—"}
+                    </div>
                   </div>
                   <div className="rounded-xl bg-gray-50 border border-gray-200 p-3">
                     <div className="text-xs text-gray-500">Email</div>
-                    <div className="text-sm font-semibold text-gray-900">{prefill.email || "—"}</div>
+                    <div className="text-sm font-semibold text-gray-900">
+                      {prefill.email || "—"}
+                    </div>
                   </div>
                   <div className="rounded-xl bg-gray-50 border border-gray-200 p-3">
                     <div className="text-xs text-gray-500">Phone</div>
-                    <div className="text-sm font-semibold text-gray-900">{prefill.phone || "—"}</div>
+                    <div className="text-sm font-semibold text-gray-900">
+                      {prefill.phone || "—"}
+                    </div>
                   </div>
                   <div className="rounded-xl bg-gray-50 border border-gray-200 p-3">
                     <div className="text-xs text-gray-500">User ID</div>
-                    <div className="text-sm font-mono text-gray-800 truncate">{prefill.userId || "—"}</div>
+                    <div className="text-sm font-mono text-gray-800 truncate">
+                      {prefill.userId || "—"}
+                    </div>
                   </div>
                 </div>
 
@@ -302,9 +358,10 @@ export const Support = () => {
                 <div>
                   <label className="text-sm font-semibold text-gray-800">Subject</label>
                   <input
+                    disabled={hasActiveTicket}
                     value={subject}
                     onChange={(e) => setSubject(e.target.value)}
-                    className="mt-2 w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                    className="mt-2 w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-200 disabled:bg-gray-100 disabled:cursor-not-allowed"
                     placeholder="e.g. Payment failed but amount deducted"
                   />
                 </div>
@@ -314,9 +371,10 @@ export const Support = () => {
                   <div>
                     <label className="text-sm font-semibold text-gray-800">Category</label>
                     <select
+                      disabled={hasActiveTicket}
                       value={category}
                       onChange={(e) => setCategory(e.target.value)}
-                      className="mt-2 w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                      className="mt-2 w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-200 disabled:bg-gray-100 disabled:cursor-not-allowed"
                     >
                       <option value="payment">Payment</option>
                       <option value="booking">Booking</option>
@@ -330,9 +388,10 @@ export const Support = () => {
                   <div>
                     <label className="text-sm font-semibold text-gray-800">Priority</label>
                     <select
+                      disabled={hasActiveTicket}
                       value={priority}
                       onChange={(e) => setPriority(e.target.value)}
-                      className="mt-2 w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                      className="mt-2 w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-200 disabled:bg-gray-100 disabled:cursor-not-allowed"
                     >
                       <option value="low">Low</option>
                       <option value="medium">Medium</option>
@@ -346,10 +405,11 @@ export const Support = () => {
                 <div>
                   <label className="text-sm font-semibold text-gray-800">Issue details</label>
                   <textarea
+                    disabled={hasActiveTicket}
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     rows={5}
-                    className="mt-2 w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                    className="mt-2 w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-200 disabled:bg-gray-100 disabled:cursor-not-allowed"
                     placeholder="Explain the issue clearly. Add booking id or transaction details if relevant."
                   />
                 </div>
@@ -357,13 +417,15 @@ export const Support = () => {
                 {/* Attachment */}
                 <div className="rounded-xl border border-gray-200 p-4">
                   <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm font-semibold text-gray-800">Attachment (optional)</div>
+                    <div className="text-sm font-semibold text-gray-800">
+                      Attachment (optional)
+                    </div>
                     <input ref={fileRef} type="file" className="hidden" onChange={onFileChange} />
                     <button
                       type="button"
                       onClick={handlePickFile}
-                      className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-50 border border-gray-200 hover:bg-gray-100"
-                      disabled={attachUploading}
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-50 border border-gray-200 hover:bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                      disabled={attachUploading || hasActiveTicket}
                     >
                       {attachUploading ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -377,7 +439,8 @@ export const Support = () => {
                   {attachMeta?.url ? (
                     <div className="mt-3 text-sm text-gray-700 flex items-center gap-2">
                       <BadgeCheck className="w-4 h-4 text-emerald-600" />
-                      Attached: <span className="font-semibold">{attachMeta.name || "file"}</span>
+                      Attached:{" "}
+                      <span className="font-semibold">{attachMeta.name || "file"}</span>
                     </div>
                   ) : (
                     <div className="mt-2 text-xs text-gray-500">
@@ -388,10 +451,14 @@ export const Support = () => {
 
                 <button
                   type="submit"
-                  disabled={creating}
-                  className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition disabled:opacity-60"
+                  disabled={creating || hasActiveTicket}
+                  className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  {creating ? <Loader2 className="w-5 h-5 animate-spin" /> : <PlusCircle className="w-5 h-5" />}
+                  {creating ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <PlusCircle className="w-5 h-5" />
+                  )}
                   Create Ticket
                 </button>
               </form>
@@ -430,7 +497,8 @@ export const Support = () => {
                                 {t.subject || "No subject"}
                               </div>
                               <div className="text-xs text-gray-500 mt-1">
-                                {t.category || "other"} • {fmt(t.lastMessageAt || t.updatedAt || t.createdAt)}
+                                {t.category || "other"} •{" "}
+                                {fmt(t.lastMessageAt || t.updatedAt || t.createdAt)}
                               </div>
                             </div>
                             <span className={pill(t.status)}>{t.status}</span>
@@ -458,7 +526,8 @@ export const Support = () => {
                         <div className="text-xs text-gray-500 mt-1">
                           {detail?.ticket?._id ? (
                             <>
-                              Ticket ID: <span className="font-mono">{detail.ticket._id}</span>
+                              Ticket ID:{" "}
+                              <span className="font-mono">{detail.ticket._id}</span>
                             </>
                           ) : (
                             "—"
@@ -481,12 +550,13 @@ export const Support = () => {
                         {detail.messages.map((m) => {
                           const mine = m.senderRole === "user";
                           return (
-                            <div key={m._id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+                            <div
+                              key={m._id}
+                              className={`flex ${mine ? "justify-end" : "justify-start"}`}
+                            >
                               <div
                                 className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm border ${
-                                  mine
-                                    ? "bg-white border-indigo-100"
-                                    : "bg-white border-gray-200"
+                                  mine ? "bg-white border-indigo-100" : "bg-white border-gray-200"
                                 }`}
                               >
                                 <div className="text-xs text-gray-500 flex items-center justify-between gap-3">
@@ -550,7 +620,8 @@ export const Support = () => {
                           <div className="text-xs text-gray-500">
                             {attachMeta?.url ? (
                               <>
-                                Attached: <span className="font-semibold">{attachMeta.name || "file"}</span>
+                                Attached:{" "}
+                                <span className="font-semibold">{attachMeta.name || "file"}</span>
                               </>
                             ) : (
                               "You can attach proof if needed."
@@ -562,7 +633,7 @@ export const Support = () => {
                             <button
                               type="button"
                               onClick={handlePickFile}
-                              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-50 border border-gray-200 hover:bg-gray-100"
+                              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-50 border border-gray-200 hover:bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed"
                               disabled={!selectedId || attachUploading}
                               title="Attach file"
                             >
@@ -579,7 +650,11 @@ export const Support = () => {
                               disabled={!selectedId || sending}
                               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition disabled:opacity-60"
                             >
-                              {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                              {sending ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Send className="w-4 h-4" />
+                              )}
                               Send
                             </button>
                           </div>
