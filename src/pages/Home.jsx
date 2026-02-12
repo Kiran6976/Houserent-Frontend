@@ -543,7 +543,10 @@ export const HomePage = () => {
                 <Link className="block hover:text-white" to={primaryCtaLink}>
                   Dashboard
                 </Link>
-                <span className="block text-white/50">Support: coming soon</span>
+                <Link className="block hover:text-white" to="/support">
+                  Support
+                </Link>
+
               </div>
 
               {/* Legal */}

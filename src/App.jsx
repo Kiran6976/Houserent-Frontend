@@ -23,13 +23,13 @@ import { VisitRequests } from "./pages/VisitRequests";
 import { TenantPayments } from "./pages/TenantPayments";
 import { LandlordRentPayments } from "./pages/LandlordRentPayments";
 import { LandlordPayouts } from "./pages/LandlordPayouts";
-
+import { Support } from "./pages/Support";
 // Admin Pages
 import { AdminLogin } from "./pages/AdminLogin";
 import { AdminDashboard } from "./pages/AdminDashboard";
 import { AdminHouses } from "./pages/AdminHouses";
 import { AdminPayments } from "./pages/AdminPayments";
-
+import { AdminSupport } from "./pages/AdminSupport";
 // Landlord Pages
 import { LandlordDashboard } from "./pages/LandlordDashboard";
 import { AddHouse } from "./pages/AddHouse";
@@ -60,6 +60,7 @@ export function App() {
               <Route path="/refund-policy" element={<RefundPolicy />} />
               <Route path="/tenant/payments/:houseId" element={<TenantPayments />} />
               <Route path="/landlord/payouts" element={<LandlordPayouts />} />
+              <Route path="/support" element={<Support />} />
 
               {/* Admin Routes */}
               <Route path="/admin" element={<AdminLogin />} />
@@ -68,6 +69,14 @@ export function App() {
                 element={
                   <ProtectedRoute requiredRole="admin">
                     <AdminDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/support"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <AdminSupport />
                   </ProtectedRoute>
                 }
               />
