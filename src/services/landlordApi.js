@@ -40,7 +40,7 @@ export const landlordVacateHouse = async (houseId, token) => {
 };
 
 // -----------------------------
-// NEW: Rent Payments (folders + history + approve/reject)
+// Rent Payments (folders + history + approve/reject)
 // -----------------------------
 
 // ✅ List tenants as "folders" with counts
@@ -67,7 +67,7 @@ export const landlordRentHistoryByTenant = async (tenantId, token) => {
   return data; // { success, payments: [...] }
 };
 
-// ✅ Pending approvals (optional, if you still want to use it anywhere)
+// ✅ Pending approvals (optional)
 // GET /api/rent-payments/landlord/pending
 export const landlordRentPending = async (token) => {
   const res = await fetch(`${API_URL}/api/rent-payments/landlord/pending`, {
@@ -104,4 +104,21 @@ export const landlordRejectRentPayment = async (paymentId, note, token) => {
   const data = await safeJson(res);
   if (!res.ok) throwHttpError(res, data, "Reject failed");
   return data; // { success, status }
+};
+
+// -----------------------------
+// ✅ NEW: Booking Fee Payouts (Admin payouts to Landlord)
+// -----------------------------
+
+// ✅ Landlord payouts list
+// GET /api/landlord/payouts?status=transferred|approved|all
+export const landlordGetPayouts = async (token, status = "transferred") => {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : "";
+  const res = await fetch(`${API_URL}/api/landlord/payouts${qs}`, {
+    headers: authHeaders(token),
+  });
+
+  const data = await safeJson(res);
+  if (!res.ok) throwHttpError(res, data, "Failed to load payouts");
+  return data; // { success, bookings: [...] }
 };

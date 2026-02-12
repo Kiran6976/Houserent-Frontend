@@ -22,6 +22,7 @@ import { MyVisits } from "./pages/MyVisits";
 import { VisitRequests } from "./pages/VisitRequests";
 import { TenantPayments } from "./pages/TenantPayments";
 import { LandlordRentPayments } from "./pages/LandlordRentPayments";
+import { LandlordPayouts } from "./pages/LandlordPayouts";
 
 // Admin Pages
 import { AdminLogin } from "./pages/AdminLogin";
@@ -58,6 +59,7 @@ export function App() {
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/refund-policy" element={<RefundPolicy />} />
               <Route path="/tenant/payments/:houseId" element={<TenantPayments />} />
+              <Route path="/landlord/payouts" element={<LandlordPayouts />} />
 
               {/* Admin Routes */}
               <Route path="/admin" element={<AdminLogin />} />

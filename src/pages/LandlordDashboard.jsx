@@ -316,27 +316,41 @@ export const LandlordDashboard = () => {
         </div>
 
         {/* Actions Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">My Properties</h2>
-            <p className="text-gray-600">Manage your rental listings</p>
-          </div>
-          <Link
-            to="/landlord/add-house"
-            className="inline-flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-xl font-medium hover:bg-indigo-700 transition shadow-lg shadow-indigo-200"
-          >
-            <Plus className="w-5 h-5" />
-            Add New Property
-          </Link>
-          <Link
-            to="/landlord/tenants"
-            className="inline-flex items-center gap-2 bg-white border border-gray-200 text-gray-800 px-6 py-3 rounded-xl font-medium hover:bg-gray-50 transition"
-          >
-            <Users className="w-5 h-5 text-indigo-600" />
-            Users / Tenants
-          </Link>
+       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-8">
+  {/* Left Title Section */}
+  <div>
+    <h2 className="text-2xl font-bold text-gray-900">My Properties</h2>
+    <p className="text-gray-600">Manage your rental listings</p>
+  </div>
 
-        </div>
+  {/* Right Action Buttons */}
+  <div className="flex flex-wrap gap-3">
+    <Link
+      to="/landlord/add-house"
+      className="inline-flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-xl font-medium hover:bg-indigo-700 transition shadow-lg shadow-indigo-200"
+    >
+      <Plus className="w-5 h-5" />
+      Add New Property
+    </Link>
+
+    <Link
+      to="/landlord/tenants"
+      className="inline-flex items-center gap-2 bg-white border border-gray-200 text-gray-800 px-6 py-3 rounded-xl font-medium hover:bg-gray-50 transition"
+    >
+      <Users className="w-5 h-5 text-indigo-600" />
+      Users / Tenants
+    </Link>
+
+    {/* ✅ NEW: Booking Fee Payouts Button */}
+    <Link
+      to="/landlord/payouts"
+      className="inline-flex items-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-xl font-medium hover:bg-emerald-700 transition shadow-lg shadow-emerald-200"
+    >
+      💰 Booking Fee Payouts
+    </Link>
+  </div>
+</div>
+
 
         {/* Houses Grid */}
         {houses.length > 0 ? (
