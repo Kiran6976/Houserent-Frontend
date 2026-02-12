@@ -1,3 +1,4 @@
+// pages/HouseDetails.jsx
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -45,8 +46,9 @@ export const HouseDetails = () => {
   const [payLoading, setPayLoading] = useState(false);
   const [payData, setPayData] = useState(null);
 
-  // ✅ if backend says "active booking exists" we store it here to cancel
-  const [activeBooking, setActiveBooking] = useState(null); // { bookingId, message }
+  // ✅ if backend says "active booking exists" we store it here
+  // { bookingId?: string|null, message: string, canCancel: boolean }
+  const [activeBooking, setActiveBooking] = useState(null);
   const [cancelLoading, setCancelLoading] = useState(false);
 
   // ✅ Booking status polling
@@ -232,7 +234,6 @@ export const HouseDetails = () => {
         const status = data?.status;
         if (status) setBookingStatus(status);
 
-        // ✅ Updated success meaning
         if (status === "approved") {
           stopPolling();
           showToast("Booking approved ✅ You are now confirmed!", "success");
@@ -362,6 +363,12 @@ export const HouseDetails = () => {
       return;
     }
 
+    // extra guard - shouldn't happen now
+    if (activeBooking && activeBooking.canCancel === false) {
+      showToast("You cannot cancel someone else's booking.", "error");
+      return;
+    }
+
     const ok = window.confirm("Cancel this booking? You can book again after cancelling.");
     if (!ok) return;
 
@@ -421,11 +428,19 @@ export const HouseDetails = () => {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        if (res.status === 400 && data?.bookingId) {
-          setActiveBooking({ bookingId: data.bookingId, message: data?.message || "Active booking exists." });
-          showToast(data?.message || "Active booking exists. You can cancel it.", "info");
+        // ✅ Active booking exists (mine OR another tenant)
+        if ((res.status === 400 || res.status === 409) && data?.message) {
+          setActiveBooking({
+            bookingId: data?.canCancel ? data?.bookingId : null,
+            message: data?.message || "Active booking exists.",
+            canCancel: !!data?.canCancel,
+            status: data?.status,
+          });
+
+          showToast(data?.message || "Active booking exists.", "info");
           return;
         }
+
         throw new Error(data?.message || "Failed to create booking");
       }
 
@@ -869,221 +884,228 @@ export const HouseDetails = () => {
         </div>
       )}
 
-  {/* ✅ Booking Modal (Responsive) */}
-{showBookingModal && (
-  <div className="fixed inset-0 z-50">
-    {/* Backdrop */}
-    <div className="absolute inset-0 bg-black/50" onClick={closeBookingModal} />
+      {/* ✅ Booking Modal (Responsive) */}
+      {showBookingModal && (
+        <div className="fixed inset-0 z-50">
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/50" onClick={closeBookingModal} />
 
-    {/* Modal wrapper */}
-    <div className="absolute inset-0 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div
-        className="
-          w-full sm:max-w-md
-          bg-white
-          rounded-t-2xl sm:rounded-2xl
-          shadow-2xl
-          max-h-[92vh] sm:max-h-[90vh]
-          overflow-hidden
-        "
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="sticky top-0 z-10 bg-white border-b px-4 sm:px-6 py-4 flex items-start justify-between gap-3">
-          <div>
-            <h3 className="text-lg sm:text-xl font-bold text-gray-900">Pay Booking Amount</h3>
-            <p className="text-xs sm:text-sm text-gray-600 mt-1">
-              Pay ₹{bookingAmount.toLocaleString("en-IN")} to book this property.
-            </p>
-          </div>
+          {/* Modal wrapper */}
+          <div className="absolute inset-0 flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div
+              className="
+                w-full sm:max-w-md
+                bg-white
+                rounded-t-2xl sm:rounded-2xl
+                shadow-2xl
+                max-h-[92vh] sm:max-h-[90vh]
+                overflow-hidden
+              "
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="sticky top-0 z-10 bg-white border-b px-4 sm:px-6 py-4 flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-lg sm:text-xl font-bold text-gray-900">Pay Booking Amount</h3>
+                  <p className="text-xs sm:text-sm text-gray-600 mt-1">
+                    Pay ₹{bookingAmount.toLocaleString("en-IN")} to book this property.
+                  </p>
+                </div>
 
-          <button
-            onClick={closeBookingModal}
-            className="shrink-0 w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-600"
-            aria-label="Close"
-            type="button"
-          >
-            ✕
-          </button>
-        </div>
+                <button
+                  onClick={closeBookingModal}
+                  className="shrink-0 w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-600"
+                  aria-label="Close"
+                  type="button"
+                >
+                  ✕
+                </button>
+              </div>
 
-        {/* Body (scrollable) */}
-        <div className="px-4 sm:px-6 py-4 overflow-y-auto max-h-[calc(92vh-64px)] sm:max-h-[calc(90vh-72px)]">
-          {payLoading ? (
-            <div className="py-10 flex items-center justify-center">
-              <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
-            </div>
-          ) : activeBooking?.bookingId ? (
-            <div className="mt-2">
-              <div className="rounded-xl border p-4 bg-red-50">
-                <div className="flex items-start gap-3">
-                  <XCircle className="w-5 h-5 text-red-600 mt-0.5" />
-                  <div>
-                    <div className="font-semibold text-red-700">Active booking already exists</div>
-                    <div className="text-sm text-red-700/90 mt-1">{activeBooking.message}</div>
-                    <div className="text-xs text-gray-600 mt-2">
-                      Booking ID: <b>{activeBooking.bookingId}</b>
+              {/* Body (scrollable) */}
+              <div className="px-4 sm:px-6 py-4 overflow-y-auto max-h-[calc(92vh-64px)] sm:max-h-[calc(90vh-72px)]">
+                {payLoading ? (
+                  <div className="py-10 flex items-center justify-center">
+                    <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
+                  </div>
+                ) : activeBooking ? (
+                  <div className="mt-2">
+                    <div className="rounded-xl border p-4 bg-red-50">
+                      <div className="flex items-start gap-3">
+                        <XCircle className="w-5 h-5 text-red-600 mt-0.5" />
+                        <div>
+                          <div className="font-semibold text-red-700">Active booking already exists</div>
+                          <div className="text-sm text-red-700/90 mt-1">{activeBooking.message}</div>
+
+                          {activeBooking.canCancel && activeBooking.bookingId ? (
+                            <div className="text-xs text-gray-600 mt-2">
+                              Booking ID: <b>{activeBooking.bookingId}</b>
+                            </div>
+                          ) : (
+                            <div className="text-xs text-gray-600 mt-2">
+                              This booking belongs to another tenant. Please try again later.
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              </div>
 
-              <button
-                onClick={cancelBooking}
-                disabled={cancelLoading}
-                className="mt-4 w-full py-3 bg-red-600 text-white rounded-xl font-medium hover:bg-red-700 transition flex items-center justify-center gap-2 disabled:opacity-60"
-                type="button"
-              >
-                {cancelLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Ban className="w-5 h-5" />}
-                {cancelLoading ? "Cancelling..." : "Cancel Booking"}
-              </button>
-
-              <button
-                onClick={closeBookingModal}
-                className="mt-3 w-full py-2.5 border border-gray-200 text-gray-800 rounded-xl hover:bg-gray-50 transition"
-                type="button"
-              >
-                Close
-              </button>
-            </div>
-          ) : payData ? (
-            <div className="mt-2">
-              {/* Summary */}
-              <div className="rounded-xl border p-4 bg-gray-50">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs sm:text-sm text-gray-600">Amount</p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      ₹{Number(payData.amount || 0).toLocaleString("en-IN")}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1 break-all">
-                      Pay To: <b>{payData?.payee?.upiId || "UPI"}</b>
-                    </p>
-                  </div>
-
-                  <div className="shrink-0">{statusBadge(bookingStatus)}</div>
-                </div>
-              </div>
-
-              {/* QR */}
-              <div className="mt-4 flex justify-center">
-                <div className="rounded-xl border p-3 bg-white">
-                  <QRCodeCanvas value={payData.upiLink} size={220} />
-                </div>
-              </div>
-
-              {/* ✅ Payment Proof Section */}
-              <div className="mt-4 rounded-xl border p-4 bg-gray-50">
-                <div className="font-semibold text-gray-900">After Payment</div>
-                <p className="text-xs text-gray-600 mt-1">
-                  Enter your UTR/Transaction ID and (optional) upload screenshot.
-                </p>
-
-                <div className="mt-3 space-y-3">
-                  <input
-                    value={utrInput}
-                    onChange={(e) => setUtrInput(e.target.value)}
-                    placeholder="UTR / Transaction ID *"
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500 outline-none"
-                  />
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <label className="cursor-pointer w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 transition">
-                      <UploadCloud className="w-4 h-4 text-indigo-600" />
-                      <span className="text-sm font-medium">
-                        {uploadingProof ? "Uploading..." : "Upload Screenshot"}
-                      </span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        disabled={uploadingProof}
-                        onChange={(e) => uploadProofImage(e.target.files?.[0])}
-                      />
-                    </label>
+                    {activeBooking.canCancel ? (
+                      <button
+                        onClick={cancelBooking}
+                        disabled={cancelLoading}
+                        className="mt-4 w-full py-3 bg-red-600 text-white rounded-xl font-medium hover:bg-red-700 transition flex items-center justify-center gap-2 disabled:opacity-60"
+                        type="button"
+                      >
+                        {cancelLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Ban className="w-5 h-5" />}
+                        {cancelLoading ? "Cancelling..." : "Cancel Booking"}
+                      </button>
+                    ) : null}
 
                     <button
+                      onClick={closeBookingModal}
+                      className="mt-3 w-full py-2.5 border border-gray-200 text-gray-800 rounded-xl hover:bg-gray-50 transition"
                       type="button"
-                      disabled={!proofUrl}
-                      onClick={() => window.open(proofUrl, "_blank")}
-                      className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 transition disabled:opacity-50"
                     >
-                      <ImageIcon className="w-4 h-4 text-indigo-600" />
-                      View
+                      Close
                     </button>
                   </div>
+                ) : payData ? (
+                  <div className="mt-2">
+                    {/* Summary */}
+                    <div className="rounded-xl border p-4 bg-gray-50">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-xs sm:text-sm text-gray-600">Amount</p>
+                          <p className="text-2xl font-bold text-gray-900">
+                            ₹{Number(payData.amount || 0).toLocaleString("en-IN")}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1 break-all">
+                            Pay To: <b>{payData?.payee?.upiId || "UPI"}</b>
+                          </p>
+                        </div>
 
-                  {proofUrl ? (
-                    <div className="text-xs text-green-700 font-medium">Screenshot uploaded ✅</div>
-                  ) : (
-                    <div className="text-xs text-gray-500">Screenshot is optional, but recommended.</div>
-                  )}
-                </div>
+                        <div className="shrink-0">{statusBadge(bookingStatus)}</div>
+                      </div>
+                    </div>
+
+                    {/* QR */}
+                    <div className="mt-4 flex justify-center">
+                      <div className="rounded-xl border p-3 bg-white">
+                        <QRCodeCanvas value={payData.upiLink} size={220} />
+                      </div>
+                    </div>
+
+                    {/* ✅ Payment Proof Section */}
+                    <div className="mt-4 rounded-xl border p-4 bg-gray-50">
+                      <div className="font-semibold text-gray-900">After Payment</div>
+                      <p className="text-xs text-gray-600 mt-1">
+                        Enter your UTR/Transaction ID and (optional) upload screenshot.
+                      </p>
+
+                      <div className="mt-3 space-y-3">
+                        <input
+                          value={utrInput}
+                          onChange={(e) => setUtrInput(e.target.value)}
+                          placeholder="UTR / Transaction ID *"
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500 outline-none"
+                        />
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <label className="cursor-pointer w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 transition">
+                            <UploadCloud className="w-4 h-4 text-indigo-600" />
+                            <span className="text-sm font-medium">
+                              {uploadingProof ? "Uploading..." : "Upload Screenshot"}
+                            </span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              disabled={uploadingProof}
+                              onChange={(e) => uploadProofImage(e.target.files?.[0])}
+                            />
+                          </label>
+
+                          <button
+                            type="button"
+                            disabled={!proofUrl}
+                            onClick={() => window.open(proofUrl, "_blank")}
+                            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 transition disabled:opacity-50"
+                          >
+                            <ImageIcon className="w-4 h-4 text-indigo-600" />
+                            View
+                          </button>
+                        </div>
+
+                        {proofUrl ? (
+                          <div className="text-xs text-green-700 font-medium">Screenshot uploaded ✅</div>
+                        ) : (
+                          <div className="text-xs text-gray-500">Screenshot is optional, but recommended.</div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Buttons */}
+                    <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <button
+                        onClick={() => copyText(payData.upiLink)}
+                        className="w-full py-2.5 border border-indigo-200 text-indigo-700 rounded-xl hover:bg-indigo-50 transition flex items-center justify-center gap-2"
+                        type="button"
+                      >
+                        <Copy className="w-4 h-4" />
+                        Copy UPI Link
+                      </button>
+
+                      <button
+                        onClick={() => (window.location.href = payData.upiLink)}
+                        className="w-full py-2.5 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-700 transition"
+                        type="button"
+                      >
+                        Open UPI App
+                      </button>
+
+                      <button
+                        onClick={submitPaymentProof}
+                        disabled={submittingProof}
+                        className="w-full py-2.5 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition sm:col-span-2 disabled:opacity-60"
+                        type="button"
+                      >
+                        {submittingProof ? "Submitting..." : "Submit Payment Proof"}
+                      </button>
+
+                      <button
+                        onClick={manualCheckStatus}
+                        disabled={checkingStatus}
+                        className="w-full py-2.5 border border-gray-200 text-gray-800 rounded-xl hover:bg-gray-50 transition flex items-center justify-center gap-2 disabled:opacity-60"
+                        type="button"
+                      >
+                        <RefreshCw className={`w-4 h-4 ${checkingStatus ? "animate-spin" : ""}`} />
+                        {checkingStatus ? "Checking..." : "Check Status"}
+                      </button>
+
+                      <button
+                        onClick={cancelBooking}
+                        disabled={cancelLoading}
+                        className="w-full py-2.5 border border-red-200 text-red-700 rounded-xl hover:bg-red-50 transition flex items-center justify-center gap-2 disabled:opacity-60"
+                        type="button"
+                      >
+                        {cancelLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ban className="w-4 h-4" />}
+                        {cancelLoading ? "Cancelling..." : "Cancel Booking"}
+                      </button>
+                    </div>
+
+                    <p className="text-xs text-gray-500 mt-3 break-all">
+                      Booking ID: <b>{payData.bookingId}</b>
+                    </p>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm text-red-600">Payment details not available.</p>
+                )}
               </div>
-
-              {/* Buttons */}
-              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <button
-                  onClick={() => copyText(payData.upiLink)}
-                  className="w-full py-2.5 border border-indigo-200 text-indigo-700 rounded-xl hover:bg-indigo-50 transition flex items-center justify-center gap-2"
-                  type="button"
-                >
-                  <Copy className="w-4 h-4" />
-                  Copy UPI Link
-                </button>
-
-                <button
-                  onClick={() => (window.location.href = payData.upiLink)}
-                  className="w-full py-2.5 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-700 transition"
-                  type="button"
-                >
-                  Open UPI App
-                </button>
-
-                <button
-                  onClick={submitPaymentProof}
-                  disabled={submittingProof}
-                  className="w-full py-2.5 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition sm:col-span-2 disabled:opacity-60"
-                  type="button"
-                >
-                  {submittingProof ? "Submitting..." : "Submit Payment Proof"}
-                </button>
-
-                <button
-                  onClick={manualCheckStatus}
-                  disabled={checkingStatus}
-                  className="w-full py-2.5 border border-gray-200 text-gray-800 rounded-xl hover:bg-gray-50 transition flex items-center justify-center gap-2 disabled:opacity-60"
-                  type="button"
-                >
-                  <RefreshCw className={`w-4 h-4 ${checkingStatus ? "animate-spin" : ""}`} />
-                  {checkingStatus ? "Checking..." : "Check Status"}
-                </button>
-
-                <button
-                  onClick={cancelBooking}
-                  disabled={cancelLoading}
-                  className="w-full py-2.5 border border-red-200 text-red-700 rounded-xl hover:bg-red-50 transition flex items-center justify-center gap-2 disabled:opacity-60"
-                  type="button"
-                >
-                  {cancelLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ban className="w-4 h-4" />}
-                  {cancelLoading ? "Cancelling..." : "Cancel Booking"}
-                </button>
-              </div>
-
-              <p className="text-xs text-gray-500 mt-3 break-all">
-                Booking ID: <b>{payData.bookingId}</b>
-              </p>
             </div>
-          ) : (
-            <p className="mt-2 text-sm text-red-600">Payment details not available.</p>
-          )}
+          </div>
         </div>
-      </div>
-    </div>
-  </div>
-)}
-
-
+      )}
     </div>
   );
 };
