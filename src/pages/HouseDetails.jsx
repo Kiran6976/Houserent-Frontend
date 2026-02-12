@@ -26,9 +26,14 @@ import {
   Ban,
   UploadCloud,
   Image as ImageIcon,
+  Clock,
 } from "lucide-react";
 
 const API_URL = import.meta.env.VITE_API_URL;
+
+// ✅ HOLD rule: booking valid only for 10 minutes unless proof submitted
+const HOLD_MINUTES = 10;
+const HOLD_SECONDS = HOLD_MINUTES * 60;
 
 export const HouseDetails = () => {
   const { id } = useParams();
@@ -41,13 +46,16 @@ export const HouseDetails = () => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showContactModal, setShowContactModal] = useState(false);
 
+  // ✅ Availability state to control Book Now visibility
+  // { loading: boolean, available: boolean|null, reason?: "rented"|"active_booking" }
+  const [availability, setAvailability] = useState({ loading: true, available: null, reason: "" });
+
   // ✅ Booking modal states (UPI flow)
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [payLoading, setPayLoading] = useState(false);
   const [payData, setPayData] = useState(null);
 
   // ✅ if backend says "active booking exists" we store it here
-  // { bookingId?: string|null, message: string, canCancel: boolean }
   const [activeBooking, setActiveBooking] = useState(null);
   const [cancelLoading, setCancelLoading] = useState(false);
 
@@ -70,25 +78,83 @@ export const HouseDetails = () => {
     note: "",
   });
 
+  // ✅ Hold countdown
+  const [holdLeft, setHoldLeft] = useState(null); // seconds
+  const holdTimerRef = useRef(null);
+  const [expiringHold, setExpiringHold] = useState(false);
+
   const landlord = useMemo(() => {
     return house?.landlordId && typeof house.landlordId === "object" ? house.landlordId : null;
   }, [house]);
 
+  const isHoldStatus = (s) => {
+    const x = String(s || "").toLowerCase();
+    return x === "initiated" || x === "qr_created" || x === "created" || x === "checking";
+  };
+
+  const stopHoldTimer = () => {
+    if (holdTimerRef.current) clearInterval(holdTimerRef.current);
+    holdTimerRef.current = null;
+    setHoldLeft(null);
+  };
+
+  const startHoldTimer = (seconds = HOLD_SECONDS, bookingId = null) => {
+    stopHoldTimer();
+    setHoldLeft(seconds);
+
+    holdTimerRef.current = setInterval(async () => {
+      setHoldLeft((prev) => {
+        if (prev == null) return prev;
+        if (prev <= 1) return 0;
+        return prev - 1;
+      });
+    }, 1000);
+
+    // ✅ when it hits 0, expire booking + close modal + refresh availability
+    // (separate effect below triggers)
+  };
+
+  const formatHold = (sec) => {
+    const s = Number(sec || 0);
+    const mm = Math.floor(s / 60);
+    const ss = s % 60;
+    return `${mm}:${String(ss).padStart(2, "0")}`;
+  };
+
+  const refreshAvailability = async () => {
+    try {
+      const ares = await fetch(`${API_URL}/api/bookings/house/${id}/availability`);
+      const adata = await ares.json().catch(() => ({}));
+      if (ares.ok) {
+        setAvailability({ loading: false, available: !!adata?.available, reason: adata?.reason || "" });
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  // ✅ Load house + availability
   useEffect(() => {
     const load = async () => {
       if (!id) return;
       setLoading(true);
+      setAvailability({ loading: true, available: null, reason: "" });
+
       try {
+        // 1) House
         const res = await fetch(`${API_URL}/api/houses/${id}`);
         const data = await res.json().catch(() => null);
-
         if (!res.ok) throw new Error(data?.message || "Failed to load property");
 
         setHouse(data);
         setCurrentImageIndex(0);
+
+        // 2) Availability
+        await refreshAvailability();
       } catch (err) {
         showToast(err.message || "Failed to load property", "error");
         setHouse(null);
+        setAvailability({ loading: false, available: null, reason: "" });
       } finally {
         setLoading(false);
       }
@@ -98,20 +164,45 @@ export const HouseDetails = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  // ✅ Clear polling on unmount
+  // ✅ Clear polling/timers on unmount
   useEffect(() => {
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
+      if (holdTimerRef.current) clearInterval(holdTimerRef.current);
     };
   }, []);
+
+  // ✅ auto-expire when holdLeft hits 0
+  useEffect(() => {
+    const run = async () => {
+      if (!showBookingModal) return;
+      if (!payData?.bookingId) return;
+      if (holdLeft !== 0) return;
+
+      // only expire if still hold status and proof not submitted
+      if (!isHoldStatus(bookingStatus) && bookingStatus !== null) return;
+
+      await expireHoldBooking(payData.bookingId, "Auto-expired after 10 minutes (no proof submitted)");
+      showToast("Booking expired (10 min limit). Please book again.", "error");
+
+      // close modal UI
+      internalResetBookingUI();
+      setShowBookingModal(false);
+
+      // refresh availability -> should become available
+      await refreshAvailability();
+    };
+
+    run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [holdLeft]);
 
   const nextImage = () => {
     if (house?.images?.length) setCurrentImageIndex((prev) => (prev + 1) % house.images.length);
   };
 
   const prevImage = () => {
-    if (house?.images?.length)
-      setCurrentImageIndex((prev) => (prev - 1 + house.images.length) % house.images.length);
+    if (house?.images?.length) setCurrentImageIndex((prev) => (prev - 1 + house.images.length) % house.images.length);
   };
 
   const handleContact = () => {
@@ -202,20 +293,93 @@ export const HouseDetails = () => {
     pollRef.current = null;
   };
 
-  const closeBookingModal = () => {
-    setShowBookingModal(false);
+  const internalResetBookingUI = () => {
     stopPolling();
+    stopHoldTimer();
+
     setPayData(null);
     setBookingStatus(null);
     setActiveBooking(null);
     setPayLoading(false);
     setCheckingStatus(false);
 
-    // reset proof state
     setUtrInput("");
     setProofUrl("");
     setUploadingProof(false);
     setSubmittingProof(false);
+    setExpiringHold(false);
+  };
+
+  /**
+   * ✅ Expire booking on demand (close modal / timer end)
+   * - First tries PUT /api/bookings/:id/expire (recommended backend route)
+   * - If not found, fallback to /cancel with note (still frees tenant)
+   */
+  const expireHoldBooking = async (bookingId, note = "Expired by tenant (hold ended)") => {
+    if (!bookingId || !token) return false;
+    if (expiringHold) return false;
+
+    setExpiringHold(true);
+    try {
+      // 1) try expire endpoint
+      const res = await fetch(`${API_URL}/api/bookings/${bookingId}/expire`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ note }),
+      });
+
+      // if backend doesn't have /expire, it may return 404
+      if (res.ok) {
+        setBookingStatus("expired");
+        return true;
+      }
+
+      // 2) fallback: cancel (still releases tenant-landlord lock in your current backend)
+      const cres = await fetch(`${API_URL}/api/bookings/${bookingId}/cancel`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ note }),
+      });
+
+      if (cres.ok) {
+        setBookingStatus("cancelled");
+        return true;
+      }
+
+      // ignore errors
+      return false;
+    } catch {
+      return false;
+    } finally {
+      setExpiringHold(false);
+    }
+  };
+
+  // ✅ Close booking modal:
+  // If booking is still hold-status and user closes modal without proof => expire it immediately
+  const closeBookingModal = async () => {
+    try {
+      const bookingId = payData?.bookingId;
+      const shouldExpire =
+        !!bookingId &&
+        showBookingModal &&
+        // expire only if not submitted proof
+        (isHoldStatus(bookingStatus) || bookingStatus === null);
+
+      if (shouldExpire) {
+        await expireHoldBooking(bookingId, "Closed payment modal (auto-expired hold)");
+        await refreshAvailability();
+      }
+    } finally {
+      setShowBookingModal(false);
+      internalResetBookingUI();
+    }
   };
 
   const pollBookingStatus = (bookingId) => {
@@ -234,24 +398,27 @@ export const HouseDetails = () => {
         const status = data?.status;
         if (status) setBookingStatus(status);
 
-        if (status === "approved") {
+        // ✅ stop timer on non-hold statuses
+        const endStatuses = ["payment_submitted", "paid", "approved", "transferred", "rejected", "failed", "expired", "cancelled"];
+        if (endStatuses.includes(String(status || ""))) {
           stopPolling();
+          stopHoldTimer();
+          await refreshAvailability();
+        }
+
+        if (status === "approved") {
           showToast("Booking approved ✅ You are now confirmed!", "success");
         }
         if (status === "transferred") {
-          stopPolling();
           showToast("Payout transferred ✅ Booking complete!", "success");
         }
         if (status === "rejected") {
-          stopPolling();
           showToast("Booking rejected ❌ Please contact support/admin.", "error");
         }
         if (status === "failed" || status === "expired") {
-          stopPolling();
           showToast("Payment failed/expired. Please try again.", "error");
         }
         if (status === "cancelled") {
-          stopPolling();
           showToast("Booking cancelled.", "info");
         }
       } catch {
@@ -273,9 +440,15 @@ export const HouseDetails = () => {
       setBookingStatus(data.status || null);
 
       if (data.status === "approved") {
+        stopHoldTimer();
         showToast("Booking approved ✅", "success");
       } else if (data.status === "payment_submitted") {
+        stopHoldTimer();
         showToast("Payment submitted ✅ Admin will verify soon.", "info");
+      } else if (data.status === "expired" || data.status === "cancelled") {
+        stopHoldTimer();
+        await refreshAvailability();
+        showToast(`Current status: ${data.status}`, "info");
       } else {
         showToast(`Current status: ${data.status}`, "info");
       }
@@ -347,7 +520,10 @@ export const HouseDetails = () => {
       if (!res.ok) throw new Error(data?.message || "Failed to submit payment proof");
 
       setBookingStatus("payment_submitted");
+      stopHoldTimer(); // ✅ stop timer once proof submitted
       showToast("Payment proof submitted ✅ Admin will verify soon.", "success");
+
+      await refreshAvailability();
     } catch (err) {
       showToast(err.message || "Failed to submit proof", "error");
     } finally {
@@ -363,7 +539,6 @@ export const HouseDetails = () => {
       return;
     }
 
-    // extra guard - shouldn't happen now
     if (activeBooking && activeBooking.canCancel === false) {
       showToast("You cannot cancel someone else's booking.", "error");
       return;
@@ -388,7 +563,10 @@ export const HouseDetails = () => {
       setPayData(null);
       setBookingStatus("cancelled");
       stopPolling();
-      closeBookingModal();
+      stopHoldTimer();
+      await closeBookingModal();
+
+      await refreshAvailability();
     } catch (err) {
       showToast(err.message || "Failed to cancel booking", "error");
     } finally {
@@ -398,6 +576,12 @@ export const HouseDetails = () => {
 
   // ✅ Book Now (UPI link + QR)
   const handleBookNow = async () => {
+    // extra guard
+    if (availability.loading === false && availability.available === false) {
+      showToast("This house is already booked right now. Please try later.", "info");
+      return;
+    }
+
     if (!user || !token) {
       showToast("Please login to book this property", "info");
       navigate("/login");
@@ -410,8 +594,8 @@ export const HouseDetails = () => {
     setActiveBooking(null);
     setBookingStatus(null);
     stopPolling();
+    stopHoldTimer();
 
-    // reset proof inputs
     setUtrInput("");
     setProofUrl("");
 
@@ -428,7 +612,6 @@ export const HouseDetails = () => {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        // ✅ Active booking exists (mine OR another tenant)
         if ((res.status === 400 || res.status === 409) && data?.message) {
           setActiveBooking({
             bookingId: data?.canCancel ? data?.bookingId : null,
@@ -436,6 +619,9 @@ export const HouseDetails = () => {
             canCancel: !!data?.canCancel,
             status: data?.status,
           });
+
+          // update availability so button changes after closing modal
+          setAvailability({ loading: false, available: false, reason: "active_booking" });
 
           showToast(data?.message || "Active booking exists.", "info");
           return;
@@ -451,12 +637,19 @@ export const HouseDetails = () => {
         payee: data.payee,
       });
 
+      // mark not available now (UI)
+      setAvailability({ loading: false, available: false, reason: "active_booking" });
+
+      // ✅ Start 10-min hold timer NOW
+      setBookingStatus("initiated");
+      startHoldTimer(HOLD_SECONDS, data.bookingId);
+
       if (data?.bookingId) pollBookingStatus(data.bookingId);
 
-      showToast("Scan QR / open UPI to pay booking amount", "info");
+      showToast(`Scan QR / open UPI to pay booking amount (valid for ${HOLD_MINUTES} mins)`, "info");
     } catch (err) {
       showToast(err.message || "Failed to start payment", "error");
-      closeBookingModal();
+      await closeBookingModal();
     } finally {
       setPayLoading(false);
     }
@@ -507,7 +700,7 @@ export const HouseDetails = () => {
     if (status === "payment_submitted")
       return <span className={`${base} bg-blue-100 text-blue-700`}>SUBMITTED (VERIFY)</span>;
     if (status === "paid") return <span className={`${base} bg-blue-100 text-blue-700`}>PAID (LEGACY)</span>;
-    if (status === "initiated" || status === "created")
+    if (status === "initiated" || status === "created" || status === "qr_created")
       return <span className={`${base} bg-yellow-100 text-yellow-700`}>AWAITING PAYMENT</span>;
     if (status === "rejected") return <span className={`${base} bg-red-100 text-red-700`}>REJECTED</span>;
     if (status === "failed") return <span className={`${base} bg-red-100 text-red-700`}>FAILED</span>;
@@ -516,6 +709,12 @@ export const HouseDetails = () => {
     if (status === "checking") return <span className={`${base} bg-gray-100 text-gray-700`}>CHECKING...</span>;
     return <span className={`${base} bg-gray-100 text-gray-700`}>{String(status).toUpperCase()}</span>;
   };
+
+  const showBookedButton =
+    availability.loading === false && availability.available === false && availability.reason === "active_booking";
+
+  const showRentedButton =
+    availability.loading === false && availability.available === false && availability.reason === "rented";
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -708,18 +907,40 @@ export const HouseDetails = () => {
                 </div>
               </div>
 
-              <button
-                onClick={handleBookNow}
-                disabled={bookingAmount <= 0}
-                className={`mt-4 w-full py-3 rounded-xl font-medium transition flex items-center justify-center gap-2 ${
-                  bookingAmount > 0
-                    ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                    : "bg-gray-200 text-gray-500 cursor-not-allowed"
-                }`}
-              >
-                <CreditCard className="w-5 h-5" />
-                Book Now (Pay ₹ Booking)
-              </button>
+              {/* ✅ BOOK BUTTON LOGIC */}
+              {availability.loading ? (
+                <div className="mt-4 w-full py-3 rounded-xl bg-gray-100 text-gray-600 flex items-center justify-center gap-2">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Checking availability...
+                </div>
+              ) : showRentedButton ? (
+                <button
+                  disabled
+                  className="mt-4 w-full py-3 rounded-xl font-medium bg-gray-200 text-gray-600 cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  House is already rented
+                </button>
+              ) : showBookedButton ? (
+                <button
+                  disabled
+                  className="mt-4 w-full py-3 rounded-xl font-medium bg-gray-200 text-gray-600 cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  House has been already booked
+                </button>
+              ) : (
+                <button
+                  onClick={handleBookNow}
+                  disabled={bookingAmount <= 0}
+                  className={`mt-4 w-full py-3 rounded-xl font-medium transition flex items-center justify-center gap-2 ${
+                    bookingAmount > 0
+                      ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                      : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                  }`}
+                >
+                  <CreditCard className="w-5 h-5" />
+                  Book Now (Pay ₹ Booking)
+                </button>
+              )}
 
               {bookingAmount <= 0 && (
                 <p className="mt-2 text-xs text-gray-500">Booking amount is not set by landlord for this property.</p>
@@ -826,7 +1047,7 @@ export const HouseDetails = () => {
         </div>
       )}
 
-      {/* ✅ Visit Modal */}
+      {/* Visit Modal */}
       {showVisitModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-6 max-w-md w-full">
@@ -884,32 +1105,29 @@ export const HouseDetails = () => {
         </div>
       )}
 
-      {/* ✅ Booking Modal (Responsive) */}
+      {/* Booking Modal */}
       {showBookingModal && (
         <div className="fixed inset-0 z-50">
-          {/* Backdrop */}
           <div className="absolute inset-0 bg-black/50" onClick={closeBookingModal} />
-
-          {/* Modal wrapper */}
           <div className="absolute inset-0 flex items-end sm:items-center justify-center p-0 sm:p-4">
             <div
-              className="
-                w-full sm:max-w-md
-                bg-white
-                rounded-t-2xl sm:rounded-2xl
-                shadow-2xl
-                max-h-[92vh] sm:max-h-[90vh]
-                overflow-hidden
-              "
+              className="w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[92vh] sm:max-h-[90vh] overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Header */}
               <div className="sticky top-0 z-10 bg-white border-b px-4 sm:px-6 py-4 flex items-start justify-between gap-3">
                 <div>
                   <h3 className="text-lg sm:text-xl font-bold text-gray-900">Pay Booking Amount</h3>
                   <p className="text-xs sm:text-sm text-gray-600 mt-1">
-                    Pay ₹{bookingAmount.toLocaleString("en-IN")} to book this property.
+                    Pay ₹{Number(house.bookingAmount || 0).toLocaleString("en-IN")} to book this property.
                   </p>
+
+                  {/* ✅ 10-min countdown display */}
+                  {payData?.bookingId && isHoldStatus(bookingStatus) && typeof holdLeft === "number" && (
+                    <div className="mt-2 inline-flex items-center gap-2 text-xs font-semibold text-red-700 bg-red-50 border border-red-200 px-3 py-1 rounded-full">
+                      <Clock className="w-4 h-4" />
+                      Hold expires in {formatHold(holdLeft)}
+                    </div>
+                  )}
                 </div>
 
                 <button
@@ -922,7 +1140,6 @@ export const HouseDetails = () => {
                 </button>
               </div>
 
-              {/* Body (scrollable) */}
               <div className="px-4 sm:px-6 py-4 overflow-y-auto max-h-[calc(92vh-64px)] sm:max-h-[calc(90vh-72px)]">
                 {payLoading ? (
                   <div className="py-10 flex items-center justify-center">
@@ -972,7 +1189,6 @@ export const HouseDetails = () => {
                   </div>
                 ) : payData ? (
                   <div className="mt-2">
-                    {/* Summary */}
                     <div className="rounded-xl border p-4 bg-gray-50">
                       <div className="flex items-center justify-between gap-3">
                         <div>
@@ -989,14 +1205,12 @@ export const HouseDetails = () => {
                       </div>
                     </div>
 
-                    {/* QR */}
                     <div className="mt-4 flex justify-center">
                       <div className="rounded-xl border p-3 bg-white">
                         <QRCodeCanvas value={payData.upiLink} size={220} />
                       </div>
                     </div>
 
-                    {/* ✅ Payment Proof Section */}
                     <div className="mt-4 rounded-xl border p-4 bg-gray-50">
                       <div className="font-semibold text-gray-900">After Payment</div>
                       <p className="text-xs text-gray-600 mt-1">
@@ -1042,10 +1256,16 @@ export const HouseDetails = () => {
                         ) : (
                           <div className="text-xs text-gray-500">Screenshot is optional, but recommended.</div>
                         )}
+
+                        {/* ✅ warning about hold */}
+                        {isHoldStatus(bookingStatus) && (
+                          <div className="text-xs text-red-700">
+                            ⚠️ Booking hold expires in {HOLD_MINUTES} minutes if you don’t submit proof.
+                          </div>
+                        )}
                       </div>
                     </div>
 
-                    {/* Buttons */}
                     <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <button
                         onClick={() => copyText(payData.upiLink)}
@@ -1066,7 +1286,7 @@ export const HouseDetails = () => {
 
                       <button
                         onClick={submitPaymentProof}
-                        disabled={submittingProof}
+                        disabled={submittingProof || expiringHold}
                         className="w-full py-2.5 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition sm:col-span-2 disabled:opacity-60"
                         type="button"
                       >
@@ -1085,7 +1305,7 @@ export const HouseDetails = () => {
 
                       <button
                         onClick={cancelBooking}
-                        disabled={cancelLoading}
+                        disabled={cancelLoading || expiringHold}
                         className="w-full py-2.5 border border-red-200 text-red-700 rounded-xl hover:bg-red-50 transition flex items-center justify-center gap-2 disabled:opacity-60"
                         type="button"
                       >
