@@ -15,7 +15,9 @@ import {
   Home,
   LogOut,
   CreditCard,
-  LifeBuoy
+  LifeBuoy,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -29,6 +31,10 @@ export const AdminDashboard = () => {
   const [tenants, setTenants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState(null);
+
+  // ✅ Aadhaar view state per landlord
+  // { [userId]: { open: boolean, number: string|null, loading: boolean } }
+  const [aadhaarView, setAadhaarView] = useState({});
 
   const authHeaders = {
     "Content-Type": "application/json",
@@ -94,6 +100,13 @@ export const AdminDashboard = () => {
       if (u.role === "landlord") setLandlords((prev) => prev.filter((x) => x._id !== u._id));
       else setTenants((prev) => prev.filter((x) => x._id !== u._id));
 
+      // cleanup aadhaar state
+      setAadhaarView((prev) => {
+        const copy = { ...prev };
+        delete copy[u._id];
+        return copy;
+      });
+
       showToast("User deleted successfully", "success");
     } catch (err) {
       showToast(err.message || "Delete failed", "error");
@@ -121,6 +134,60 @@ export const AdminDashboard = () => {
       showToast(err.message || "Action failed", "error");
     } finally {
       setProcessingId(null);
+    }
+  };
+
+  // ✅ View full Aadhaar (fetch only when admin clicks eye)
+  // Backend required: GET /api/admin/users/:id/aadhaar -> { success:true, aadhaarNumber:"1234..." }
+  const handleToggleAadhaar = async (id) => {
+    const current = aadhaarView[id];
+
+    // close if already open
+    if (current?.open) {
+      setAadhaarView((prev) => ({
+        ...prev,
+        [id]: { ...(prev[id] || {}), open: false },
+      }));
+      return;
+    }
+
+    // open if we already have number cached
+    if (current?.number) {
+      setAadhaarView((prev) => ({
+        ...prev,
+        [id]: { ...(prev[id] || {}), open: true, loading: false },
+      }));
+      return;
+    }
+
+    // fetch full number
+    setAadhaarView((prev) => ({
+      ...prev,
+      [id]: { ...(prev[id] || {}), open: true, loading: true, number: null },
+    }));
+
+    try {
+      const res = await fetch(`${API_URL}/api/admin/users/${id}/aadhaar`, {
+        headers: authHeaders,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.message || "Failed to fetch Aadhaar");
+
+      setAadhaarView((prev) => ({
+        ...prev,
+        [id]: {
+          ...(prev[id] || {}),
+          open: true,
+          loading: false,
+          number: data?.aadhaarNumber || data?.aadhaar || null,
+        },
+      }));
+    } catch (err) {
+      setAadhaarView((prev) => ({
+        ...prev,
+        [id]: { ...(prev[id] || {}), open: false, loading: false, number: null },
+      }));
+      showToast(err.message || "Failed to fetch Aadhaar", "error");
     }
   };
 
@@ -166,15 +233,13 @@ export const AdminDashboard = () => {
                 Support Tickets
               </Link>
 
-
               <Link
-  to="/admin/payments"
-  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/15 hover:bg-white/20 border border-white/20 transition"
->
-  <CreditCard className="w-4 h-4" />
-  Payments
-</Link>
-
+                to="/admin/payments"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/15 hover:bg-white/20 border border-white/20 transition"
+              >
+                <CreditCard className="w-4 h-4" />
+                Payments
+              </Link>
 
               <button
                 onClick={handleLogout}
@@ -222,6 +287,45 @@ export const AdminDashboard = () => {
                           </span>
                           <span className="inline-flex items-center gap-1 truncate max-w-[240px]">
                             <MapPin className="w-4 h-4 flex-shrink-0" /> {l.address}
+                          </span>
+
+                          {/* ✅ Aadhaar BELOW address (same styling style; no layout redesign) */}
+                          <span className="inline-flex items-center gap-2">
+                            <span className="inline-flex items-center gap-2">
+                              <span className="text-gray-600">
+                                Aadhaar:{" "}
+                                <span className="font-medium text-gray-900">
+                                  {aadhaarView[l._id]?.open
+                                    ? aadhaarView[l._id]?.loading
+                                      ? "Loading..."
+                                      : aadhaarView[l._id]?.number || "Not available"
+                                    : l.aadhaarLast4
+                                    ? `•••• •••• ${l.aadhaarLast4}`
+                                    : "Not provided"}
+                                </span>
+                              </span>
+
+                              {l.aadhaarLast4 && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleAadhaar(l._id)}
+                                  className="inline-flex items-center justify-center"
+                                  title={aadhaarView[l._id]?.open ? "Hide Aadhaar" : "View Aadhaar"}
+                                >
+                                  {aadhaarView[l._id]?.open ? (
+                                    <EyeOff className="w-4 h-4 text-gray-500" />
+                                  ) : (
+                                    <Eye className="w-4 h-4 text-gray-500" />
+                                  )}
+                                </button>
+                              )}
+
+                              {!!l.aadhaarVerified && (
+                                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                                  Aadhaar Verified
+                                </span>
+                              )}
+                            </span>
                           </span>
                         </div>
                       </div>

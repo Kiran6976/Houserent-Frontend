@@ -16,6 +16,9 @@ import {
 // Small helper: 6-digit OTP only
 const onlyDigits = (v) => v.replace(/\D/g, "").slice(0, 6);
 
+// Aadhaar helper (12 digits)
+const onlyAadhaarDigits = (v) => v.replace(/\D/g, "").slice(0, 12);
+
 export const Register = () => {
   const { register, verifyEmailOtp, resendOtp } = useAuth();
   const { showToast } = useToast();
@@ -32,6 +35,7 @@ export const Register = () => {
     confirmPassword: "",
     role: "tenant",
     phone: "",
+    aadhaarNumber: "", // ✅ NEW
   });
 
   const [errors, setErrors] = useState({});
@@ -81,6 +85,12 @@ export const Register = () => {
     if (formData.password !== formData.confirmPassword)
       newErrors.confirmPassword = "Passwords do not match";
 
+    // ✅ Aadhaar required ONLY for landlord
+    if (formData.role === "landlord") {
+      const a = onlyAadhaarDigits(formData.aadhaarNumber);
+      if (!a || a.length !== 12) newErrors.aadhaarNumber = "Aadhaar must be 12 digits";
+    }
+
     // ✅ Legal check
     if (!acceptedLegal) {
       setLegalError(
@@ -100,7 +110,7 @@ export const Register = () => {
 
     setLoading(true);
     try {
-      const result = await register({
+      const payload = {
         name: formData.name,
         age: parseInt(formData.age),
         address: formData.address,
@@ -108,7 +118,14 @@ export const Register = () => {
         password: formData.password,
         role: formData.role,
         phone: formData.phone,
-      });
+      };
+
+      // ✅ send Aadhaar ONLY for landlord
+      if (formData.role === "landlord") {
+        payload.aadhaarNumber = onlyAadhaarDigits(formData.aadhaarNumber);
+      }
+
+      const result = await register(payload);
 
       if (result?.success) {
         showToast("OTP sent to your email. Please verify.", "success");
@@ -145,15 +162,12 @@ export const Register = () => {
 
         const role = result?.user?.role;
 
-        // ✅ FIX: Redirect to routes that actually exist in App.jsx
         if (role === "admin") {
           navigate("/admin/dashboard");
           return;
         }
 
         if (role === "landlord") {
-          // If your backend returns some verified flag, we can use it.
-          // Otherwise, safest is to go to payment/verification screen first (route exists).
           const isVerified =
             result?.user?.isVerifiedLandlord ||
             result?.user?.verifiedLandlord ||
@@ -164,7 +178,6 @@ export const Register = () => {
           return;
         }
 
-        // tenant default: go Home (or you can change to /tenant/houses)
         navigate("/");
       } else {
         showToast(result?.message || "Invalid OTP", "error");
@@ -198,6 +211,14 @@ export const Register = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+
+    // ✅ Aadhaar input: digits only
+    if (name === "aadhaarNumber") {
+      setFormData((prev) => ({ ...prev, aadhaarNumber: onlyAadhaarDigits(value) }));
+      if (errors[name]) setErrors((prev) => ({ ...prev, [name]: undefined }));
+      return;
+    }
+
     setFormData((prev) => ({ ...prev, [name]: value }));
     if (errors[name]) setErrors((prev) => ({ ...prev, [name]: undefined }));
   };
@@ -330,7 +351,7 @@ export const Register = () => {
                 <button
                   type="button"
                   onClick={() =>
-                    setFormData((prev) => ({ ...prev, role: "tenant" }))
+                    setFormData((prev) => ({ ...prev, role: "tenant", aadhaarNumber: "" }))
                   }
                   className={`p-4 rounded-xl border-2 transition-all ${
                     formData.role === "tenant"
@@ -360,6 +381,30 @@ export const Register = () => {
                 </button>
               </div>
             </div>
+
+            {/* ✅ Aadhaar (Landlord only) */}
+            {formData.role === "landlord" && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Aadhaar Number
+                </label>
+                <input
+                  type="text"
+                  name="aadhaarNumber"
+                  inputMode="numeric"
+                  value={formData.aadhaarNumber}
+                  onChange={handleChange}
+                  className={`w-full px-4 py-3 rounded-lg border ${
+                    errors.aadhaarNumber ? "border-red-500" : "border-gray-300"
+                  } focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition`}
+                  placeholder="12-digit Aadhaar"
+                />
+                {errors.aadhaarNumber && (
+                  <p className="mt-1 text-sm text-red-500">{errors.aadhaarNumber}</p>
+                )}
+                
+              </div>
+            )}
 
             {/* Full Name */}
             <div>
