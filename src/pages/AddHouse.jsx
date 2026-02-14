@@ -2,7 +2,15 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
-import { Loader2, ArrowLeft, Upload, X, Image as ImageIcon } from "lucide-react";
+import {
+  Loader2,
+  ArrowLeft,
+  Upload,
+  X,
+  Image as ImageIcon,
+  FileText,
+  ExternalLink,
+} from "lucide-react";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -65,13 +73,18 @@ export const AddHouse = () => {
     amenities: [],
     images: [],
     availability: new Date().toISOString().split("T")[0],
+
+    // ✅ NEW: Electricity bill (PDF/JPG/PNG/WEBP)
+    electricityBillUrl: "",
+    electricityBillType: "",
   });
 
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false); // submit loading
   const [pageLoading, setPageLoading] = useState(false); // edit load
   const [imageUrl, setImageUrl] = useState("");
-  const [uploading, setUploading] = useState(false);
+  const [uploading, setUploading] = useState(false); // property image upload
+  const [billUploading, setBillUploading] = useState(false); // ✅ bill upload
 
   const authJsonHeaders = {
     "Content-Type": "application/json",
@@ -106,6 +119,10 @@ export const AddHouse = () => {
           availability: data.availability
             ? String(data.availability).split("T")[0]
             : new Date().toISOString().split("T")[0],
+
+          // ✅ NEW: load bill in edit mode
+          electricityBillUrl: data.electricityBillUrl || "",
+          electricityBillType: data.electricityBillType || "",
         });
       } catch (err) {
         showToast(err.message || "Failed to load house", "error");
@@ -147,6 +164,11 @@ export const AddHouse = () => {
       if (isNaN(bookingAmount) || bookingAmount < 0) {
         newErrors.bookingAmount = "Booking amount must be 0 or more";
       }
+    }
+
+    // ✅ NEW: Electricity bill required
+    if (!formData.electricityBillUrl) {
+      newErrors.electricityBillUrl = "Electricity bill is required (PDF/JPG/PNG)";
     }
 
     setErrors(newErrors);
@@ -242,6 +264,74 @@ export const AddHouse = () => {
     }
   };
 
+  // ✅ NEW: Upload electricity bill (PDF/JPG/PNG/WEBP)
+  const handleBillUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowed = [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "image/jpg",
+      "application/pdf",
+    ];
+
+    if (!allowed.includes(file.type)) {
+      showToast("Only PDF, JPG, PNG, WEBP allowed", "error");
+      e.target.value = "";
+      return;
+    }
+
+    if (!token) {
+      showToast("Please login again (token missing)", "error");
+      e.target.value = "";
+      return;
+    }
+
+    setBillUploading(true);
+    try {
+      const form = new FormData();
+      form.append("bill", file);
+
+      const res = await fetch(`${API_URL}/api/uploads/electricity-bill`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.message || "Bill upload failed");
+      if (!data?.url) throw new Error("Upload failed: no URL returned");
+
+      setFormData((prev) => ({
+        ...prev,
+        electricityBillUrl: data.url,
+        electricityBillType: data.mimeType || file.type || "",
+      }));
+
+      // clear error if any
+      if (errors.electricityBillUrl) {
+        setErrors((prev) => ({ ...prev, electricityBillUrl: undefined }));
+      }
+
+      showToast("Electricity bill uploaded", "success");
+    } catch (err) {
+      showToast(err.message || "Bill upload failed", "error");
+    } finally {
+      setBillUploading(false);
+      e.target.value = "";
+    }
+  };
+
+  const removeBill = () => {
+    setFormData((prev) => ({
+      ...prev,
+      electricityBillUrl: "",
+      electricityBillType: "",
+    }));
+  };
+
   // Create / Update house
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -260,7 +350,7 @@ export const AddHouse = () => {
         location: formData.location.trim(),
         rent: Number(formData.rent),
         deposit: Number(formData.deposit),
-        bookingAmount: formData.bookingAmount === "" ? 0 : Number(formData.bookingAmount), // ✅ NEW
+        bookingAmount: formData.bookingAmount === "" ? 0 : Number(formData.bookingAmount),
         type: formData.type,
         beds: Number(formData.beds),
         baths: Number(formData.baths),
@@ -272,6 +362,10 @@ export const AddHouse = () => {
             ? formData.images
             : [SAMPLE_IMAGES[Math.floor(Math.random() * SAMPLE_IMAGES.length)]],
         availability: formData.availability,
+
+        // ✅ NEW: send electricity bill to backend
+        electricityBillUrl: formData.electricityBillUrl,
+        electricityBillType: formData.electricityBillType,
       };
 
       const url = isEdit ? `${API_URL}/api/houses/${id}` : `${API_URL}/api/houses`;
@@ -286,7 +380,12 @@ export const AddHouse = () => {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.message || "Failed to save property");
 
-      showToast(isEdit ? "Property updated successfully!" : "Property added successfully!", "success");
+      showToast(
+        isEdit
+          ? "Property updated successfully!"
+          : "Property submitted for verification (pending admin approval)!",
+        "success"
+      );
       navigate("/landlord/dashboard");
     } catch (err) {
       showToast(err.message || "Failed to save property. Please try again.", "error");
@@ -302,6 +401,8 @@ export const AddHouse = () => {
       </div>
     );
   }
+
+  const billIsPdf = String(formData.electricityBillType || "").toLowerCase().includes("pdf");
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -349,7 +450,9 @@ export const AddHouse = () => {
                 } focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition`}
                 placeholder="Describe the property, its features, and surroundings..."
               />
-              {errors.description && <p className="mt-1 text-sm text-red-500">{errors.description}</p>}
+              {errors.description && (
+                <p className="mt-1 text-sm text-red-500">{errors.description}</p>
+              )}
             </div>
 
             {/* Location */}
@@ -570,7 +673,11 @@ export const AddHouse = () => {
                     }`}
                     title="Upload from device"
                   >
-                    {uploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <ImageIcon className="w-5 h-5" />}
+                    {uploading ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <ImageIcon className="w-5 h-5" />
+                    )}
                     <span className="hidden sm:inline">{uploading ? "Uploading..." : "Device"}</span>
 
                     <input
@@ -596,7 +703,11 @@ export const AddHouse = () => {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {formData.images.map((img, index) => (
                     <div key={index} className="relative group">
-                      <img src={img} alt={`Property ${index + 1}`} className="w-full h-24 object-cover rounded-lg" />
+                      <img
+                        src={img}
+                        alt={`Property ${index + 1}`}
+                        className="w-full h-24 object-cover rounded-lg"
+                      />
                       <button
                         type="button"
                         onClick={() => removeImage(index)}
@@ -607,6 +718,72 @@ export const AddHouse = () => {
                     </div>
                   ))}
                 </div>
+              )}
+            </div>
+
+            {/* ✅ NEW: Electricity Bill Upload */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Electricity Bill (PDF/JPG/PNG) *
+              </label>
+
+              <div className="flex flex-col sm:flex-row gap-2">
+                <label
+                  className={`px-4 py-2 rounded-lg transition text-sm cursor-pointer flex items-center gap-2 border ${
+                    billUploading
+                      ? "bg-gray-200 text-gray-500 cursor-not-allowed border-gray-200"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-300"
+                  }`}
+                  title="Upload electricity bill"
+                >
+                  {billUploading ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <FileText className="w-5 h-5" />
+                  )}
+                  <span>{billUploading ? "Uploading..." : "Upload Bill"}</span>
+
+                  <input
+                    type="file"
+                    accept="application/pdf,image/*"
+                    onChange={handleBillUpload}
+                    disabled={billUploading}
+                    className="hidden"
+                  />
+                </label>
+
+                {formData.electricityBillUrl ? (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <a
+                      href={formData.electricityBillUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition text-sm"
+                      title="View bill"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      {billIsPdf ? "View PDF" : "View Image"}
+                    </a>
+
+                    <button
+                      type="button"
+                      onClick={removeBill}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition text-sm"
+                      title="Remove bill"
+                    >
+                      <X className="w-4 h-4" />
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-500 flex items-center">
+                    Please upload a recent electricity bill for verification.
+                  </p>
+                )}
+              </div>
+
+              {errors.electricityBillUrl && (
+                <p className="mt-1 text-sm text-red-500">{errors.electricityBillUrl}</p>
               )}
             </div>
 
@@ -633,7 +810,7 @@ export const AddHouse = () => {
               </button>
               <button
                 type="submit"
-                disabled={loading || uploading}
+                disabled={loading || uploading || billUploading}
                 className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {loading ? (
@@ -648,6 +825,13 @@ export const AddHouse = () => {
                 )}
               </button>
             </div>
+
+            {!isEdit && (
+              <p className="text-xs text-gray-500">
+                After submission, your property will be <span className="font-medium">pending</span> until admin approves
+                the electricity bill.
+              </p>
+            )}
           </form>
         </div>
       </div>

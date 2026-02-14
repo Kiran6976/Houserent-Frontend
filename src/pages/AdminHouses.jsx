@@ -11,6 +11,12 @@ import {
   Mail,
   Phone,
   ImageOff,
+  FileText,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  ExternalLink,
+  Loader2
 } from "lucide-react";
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -22,6 +28,39 @@ const Pill = ({ children }) => (
     {children}
   </span>
 );
+
+// ✅ NEW: status pill (keeps your style)
+const StatusPill = ({ status }) => {
+  const s = String(status || "pending").toLowerCase();
+
+  const base =
+    "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium border";
+
+  if (s === "approved") {
+    return (
+      <span className={`${base} bg-emerald-50 text-emerald-700 border-emerald-200`}>
+        <CheckCircle2 className="w-3.5 h-3.5" />
+        Approved
+      </span>
+    );
+  }
+
+  if (s === "rejected") {
+    return (
+      <span className={`${base} bg-rose-50 text-rose-700 border-rose-200`}>
+        <XCircle className="w-3.5 h-3.5" />
+        Rejected
+      </span>
+    );
+  }
+
+  return (
+    <span className={`${base} bg-amber-50 text-amber-700 border-amber-200`}>
+      <Clock className="w-3.5 h-3.5" />
+      Pending
+    </span>
+  );
+};
 
 const SkeletonCard = () => (
   <div className="rounded-2xl border bg-white p-4 sm:p-5">
@@ -49,6 +88,9 @@ export const AdminHouses = () => {
   const [houses, setHouses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
+
+  // ✅ NEW: action loading per house
+  const [actionLoadingId, setActionLoadingId] = useState(null);
 
   const filtered = useMemo(() => {
     const s = search.trim().toLowerCase();
@@ -118,6 +160,46 @@ export const AdminHouses = () => {
     }
   };
 
+  // ✅ NEW: approve/reject handler
+  const handleVerify = async (houseId, status) => {
+    if (!houseId) return;
+
+    let reason = "";
+    if (status === "rejected") {
+      reason = prompt("Reason for rejection? (optional)") || "";
+    }
+
+    setActionLoadingId(houseId);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/houses/${houseId}/verify`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status, reason }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.message || "Failed to update verification status");
+
+      showToast(`House ${status}`, "success");
+
+      // Update the item locally (no UI restructure)
+      const updatedHouse = data?.house || null;
+      if (updatedHouse?._id) {
+        setHouses((prev) => prev.map((h) => (h._id === updatedHouse._id ? updatedHouse : h)));
+      } else {
+        // fallback: reload if backend didn't return house
+        fetchHouses();
+      }
+    } catch (e) {
+      showToast(e.message || "Verification update failed", "error");
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 py-10 px-4">
       <div className="max-w-6xl mx-auto">
@@ -167,11 +249,17 @@ export const AdminHouses = () => {
                   h.image ||
                   fallbackImg;
 
-                const locationText =
-                  h.address || h.location || h.city || "—";
+                const locationText = h.address || h.location || h.city || "—";
+                const price = h.price ?? h.rent ?? h.amount ?? null;
 
-                const price =
-                  h.price ?? h.rent ?? h.amount ?? null;
+                // ✅ NEW fields
+                const verificationStatus = h.verificationStatus || "pending";
+                const billUrl = h.electricityBillUrl || "";
+                const billType = String(h.electricityBillType || "").toLowerCase();
+                const billIsPdf = billType.includes("pdf");
+
+                const isPending = String(verificationStatus).toLowerCase() === "pending";
+                const actionBusy = actionLoadingId === h._id;
 
                 return (
                   <div
@@ -198,9 +286,14 @@ export const AdminHouses = () => {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <h3 className="text-lg font-semibold text-gray-900 truncate">
-                              {h.title || "House Listing"}
-                            </h3>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="text-lg font-semibold text-gray-900 truncate">
+                                {h.title || "House Listing"}
+                              </h3>
+
+                              {/* ✅ NEW: Verification status */}
+                              <StatusPill status={verificationStatus} />
+                            </div>
 
                             <div className="mt-2 flex flex-wrap gap-2">
                               <Pill>
@@ -220,6 +313,21 @@ export const AdminHouses = () => {
                                   <span className="font-medium">{price}</span>
                                 </Pill>
                               )}
+
+                              {/* ✅ NEW: Bill link pill */}
+                              {billUrl && (
+                                <a
+                                  href={billUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition"
+                                  title="View electricity bill"
+                                >
+                                  <FileText className="w-3.5 h-3.5" />
+                                  <span>{billIsPdf ? "Bill (PDF)" : "Bill"}</span>
+                                  <ExternalLink className="w-3.5 h-3.5" />
+                                </a>
+                              )}
                             </div>
                           </div>
 
@@ -237,21 +345,15 @@ export const AdminHouses = () => {
                         <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm text-gray-700">
                           <div className="flex items-center gap-2">
                             <User2 className="w-4 h-4 text-gray-400" />
-                            <span className="truncate">
-                              {landlord.name || "—"}
-                            </span>
+                            <span className="truncate">{landlord.name || "—"}</span>
                           </div>
                           <div className="flex items-center gap-2">
                             <Mail className="w-4 h-4 text-gray-400" />
-                            <span className="truncate">
-                              {landlord.email || "—"}
-                            </span>
+                            <span className="truncate">{landlord.email || "—"}</span>
                           </div>
                           <div className="flex items-center gap-2">
                             <Phone className="w-4 h-4 text-gray-400" />
-                            <span className="truncate">
-                              {landlord.phone || "—"}
-                            </span>
+                            <span className="truncate">{landlord.phone || "—"}</span>
                           </div>
                         </div>
 
@@ -259,6 +361,73 @@ export const AdminHouses = () => {
                         <p className="mt-3 text-sm text-gray-600 line-clamp-2">
                           {h.description ? h.description : "No description provided."}
                         </p>
+
+                        {/* ✅ NEW: Admin approve/reject row (only when pending) */}
+                        <div className="mt-4 flex flex-col sm:flex-row gap-2 sm:items-center">
+                          {billUrl ? (
+                            <a
+                              href={billUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 transition text-sm"
+                            >
+                              <FileText className="w-4 h-4" />
+                              View Electricity Bill
+                              <ExternalLink className="w-4 h-4" />
+                            </a>
+                          ) : (
+                            <div className="text-sm text-rose-600">
+                              Electricity bill not uploaded
+                            </div>
+                          )}
+
+                          <div className="flex gap-2 sm:ml-auto">
+                            <button
+                              type="button"
+                              disabled={!isPending || actionBusy || !billUrl}
+                              onClick={() => handleVerify(h._id, "approved")}
+                              className={`inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-medium border transition ${
+                                !isPending || !billUrl
+                                  ? "border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed"
+                                  : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                              }`}
+                              title={!billUrl ? "Bill required to approve" : "Approve house"}
+                            >
+                              {actionBusy ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <CheckCircle2 className="w-4 h-4" />
+                              )}
+                              Approve
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={!isPending || actionBusy}
+                              onClick={() => handleVerify(h._id, "rejected")}
+                              className={`inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-medium border transition ${
+                                !isPending
+                                  ? "border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed"
+                                  : "border-rose-200 text-rose-700 hover:bg-rose-50"
+                              }`}
+                              title="Reject house"
+                            >
+                              {actionBusy ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <XCircle className="w-4 h-4" />
+                              )}
+                              Reject
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* ✅ Optional: show reject reason if exists */}
+                        {String(verificationStatus).toLowerCase() === "rejected" && h.rejectReason ? (
+                          <p className="mt-2 text-sm text-rose-600">
+                            Rejection reason: <span className="font-medium">{h.rejectReason}</span>
+                          </p>
+                        ) : null}
                       </div>
                     </div>
 
