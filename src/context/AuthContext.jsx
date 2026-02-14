@@ -1,3 +1,4 @@
+// context/AuthContext.jsx
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 const AuthContext = createContext(undefined);
@@ -194,6 +195,24 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // ✅ NEW: Resend Forgot Password OTP
+  const resendForgotPasswordOtp = async (email) => {
+    try {
+      const { ok, data } = await request("/api/auth/forgot-password-otp/resend", {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      });
+
+      if (!ok) {
+        return { success: false, message: data?.message || "Failed to resend OTP" };
+      }
+
+      return { success: true, message: data?.message || "OTP resent (if account exists)." };
+    } catch {
+      return { success: false, message: "Network error. Please try again." };
+    }
+  };
+
   // ✅ Reset Password (verify OTP)
   const resetPassword = async ({ email, otp, password }) => {
     try {
@@ -246,6 +265,8 @@ export const AuthProvider = ({ children }) => {
       resendOtp,
 
       forgotPassword,
+      resendForgotPasswordOtp, // ✅ NEW
+
       resetPassword,
 
       fetchMe,

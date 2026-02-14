@@ -1,28 +1,48 @@
-import React, { useMemo, useState } from "react";
+// src/pages/ResetPassword.jsx (FULL UPDATED FILE - adds Resend OTP + cooldown)
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Lock, Loader2, Building2, Mail, KeyRound } from "lucide-react";
+import { Lock, Loader2, Building2, Mail, KeyRound, RotateCw } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
+
+const API_URL = import.meta.env.VITE_API_URL;
 
 export const ResetPassword = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { resetPassword } = useAuth();
+  const { resetPassword, resendForgotPasswordOtp } = useAuth();
   const { showToast } = useToast();
 
   const [email, setEmail] = useState(location?.state?.email || "");
   const [otp, setOtp] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+
   const [loading, setLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+
   const [err, setErr] = useState("");
 
   const passwordOk = useMemo(() => String(password).length >= 6, [password]);
 
-  const validate = () => {
+  // ✅ Countdown timer for resend
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setInterval(() => setCooldown((c) => c - 1), 1000);
+    return () => clearInterval(t);
+  }, [cooldown]);
+
+  const validateEmailOnly = () => {
     const e = String(email || "").trim();
     if (!e) return "Email is required";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return "Please enter a valid email";
+    return "";
+  };
+
+  const validate = () => {
+    const eMsg = validateEmailOnly();
+    if (eMsg) return eMsg;
 
     const o = String(otp || "").trim();
     if (!o) return "OTP is required";
@@ -51,11 +71,11 @@ export const ResetPassword = () => {
         password,
       });
 
-      if (res.success) {
+      if (res?.success) {
         showToast(res.message || "Password updated. Please login.", "success");
         navigate("/login");
       } else {
-        showToast(res.message || "Reset failed", "error");
+        showToast(res?.message || "Reset failed", "error");
       }
     } catch {
       showToast("Something went wrong. Please try again.", "error");
@@ -63,6 +83,35 @@ export const ResetPassword = () => {
       setLoading(false);
     }
   };
+
+ // ✅ Resend OTP handler (via AuthContext)
+const handleResendOtp = async () => {
+  const eMsg = validateEmailOnly();
+  if (eMsg) {
+    setErr(eMsg);
+    return;
+  }
+
+  setErr("");
+  setResendLoading(true);
+
+  try {
+    const res = await resendForgotPasswordOtp(email.trim());
+
+    if (!res.success) {
+      showToast(res.message || "Failed to resend OTP", "error");
+      return;
+    }
+
+    showToast(res.message || "OTP resent to your email.", "success");
+    setCooldown(30); // frontend cooldown timer
+  } catch (e) {
+    showToast("Network error while resending OTP", "error");
+  } finally {
+    setResendLoading(false);
+  }
+};
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center py-12 px-4">
@@ -116,6 +165,39 @@ export const ResetPassword = () => {
                   } focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition`}
                   placeholder="6-digit OTP"
                 />
+              </div>
+
+              {/* ✅ Resend OTP row */}
+              <div className="mt-2 flex items-center justify-between">
+                <p className="text-sm text-gray-600">Didn’t receive OTP?</p>
+
+                <button
+                  type="button"
+                  onClick={handleResendOtp}
+                  disabled={resendLoading || cooldown > 0}
+                  className={`inline-flex items-center gap-2 text-sm font-medium ${
+                    resendLoading || cooldown > 0
+                      ? "text-gray-400 cursor-not-allowed"
+                      : "text-indigo-600 hover:text-indigo-700"
+                  }`}
+                >
+                  {resendLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Sending...
+                    </>
+                  ) : cooldown > 0 ? (
+                    <>
+                      <RotateCw className="w-4 h-4" />
+                      Resend in {cooldown}s
+                    </>
+                  ) : (
+                    <>
+                      <RotateCw className="w-4 h-4" />
+                      Resend OTP
+                    </>
+                  )}
+                </button>
               </div>
             </div>
 
