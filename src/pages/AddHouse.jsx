@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
@@ -41,7 +41,6 @@ const FURNISHED_OPTIONS = [
   { value: "fully", label: "Fully Furnished" },
 ];
 
-// Sample image URLs for demo
 const SAMPLE_IMAGES = [
   "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800",
   "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800",
@@ -50,6 +49,29 @@ const SAMPLE_IMAGES = [
   "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800",
   "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800",
 ];
+
+const Field = ({ label, required, error, hint, children }) => (
+  <div>
+    <div className="flex items-end justify-between gap-3">
+      <label className="block text-sm font-semibold text-slate-800">
+        {label} {required ? <span className="text-rose-500">*</span> : null}
+      </label>
+      {hint ? <span className="text-xs text-slate-500">{hint}</span> : null}
+    </div>
+    <div className="mt-2">{children}</div>
+    {error ? <p className="mt-1.5 text-sm text-rose-600">{error}</p> : null}
+  </div>
+);
+
+const Section = ({ title, subtitle, children }) => (
+  <div className="rounded-3xl border border-slate-200 bg-white/70 backdrop-blur px-5 sm:px-6 py-5 shadow-sm">
+    <div className="mb-4">
+      <h2 className="text-base sm:text-lg font-extrabold text-slate-900">{title}</h2>
+      {subtitle ? <p className="mt-1 text-sm text-slate-600">{subtitle}</p> : null}
+    </div>
+    {children}
+  </div>
+);
 
 export const AddHouse = () => {
   const { user, token } = useAuth();
@@ -64,7 +86,7 @@ export const AddHouse = () => {
     location: "",
     rent: "",
     deposit: "",
-    bookingAmount: "", // ✅ NEW
+    bookingAmount: "",
     type: "apartment",
     beds: "1",
     baths: "1",
@@ -74,24 +96,25 @@ export const AddHouse = () => {
     images: [],
     availability: new Date().toISOString().split("T")[0],
 
-    // ✅ NEW: Electricity bill (PDF/JPG/PNG/WEBP)
     electricityBillUrl: "",
     electricityBillType: "",
   });
 
   const [errors, setErrors] = useState({});
-  const [loading, setLoading] = useState(false); // submit loading
-  const [pageLoading, setPageLoading] = useState(false); // edit load
+  const [loading, setLoading] = useState(false);
+  const [pageLoading, setPageLoading] = useState(false);
   const [imageUrl, setImageUrl] = useState("");
-  const [uploading, setUploading] = useState(false); // property image upload
-  const [billUploading, setBillUploading] = useState(false); // ✅ bill upload
+  const [uploading, setUploading] = useState(false);
+  const [billUploading, setBillUploading] = useState(false);
 
-  const authJsonHeaders = {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${token}`,
-  };
+  const authJsonHeaders = useMemo(
+    () => ({
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    }),
+    [token]
+  );
 
-  // Load house in edit mode
   useEffect(() => {
     const loadHouse = async () => {
       if (!isEdit || !id) return;
@@ -108,7 +131,7 @@ export const AddHouse = () => {
           location: data.location || "",
           rent: data.rent != null ? String(data.rent) : "",
           deposit: data.deposit != null ? String(data.deposit) : "",
-          bookingAmount: data.bookingAmount != null ? String(data.bookingAmount) : "", // ✅ NEW
+          bookingAmount: data.bookingAmount != null ? String(data.bookingAmount) : "",
           type: data.type || "apartment",
           beds: data.beds != null ? String(data.beds) : "1",
           baths: data.baths != null ? String(data.baths) : "1",
@@ -120,7 +143,6 @@ export const AddHouse = () => {
             ? String(data.availability).split("T")[0]
             : new Date().toISOString().split("T")[0],
 
-          // ✅ NEW: load bill in edit mode
           electricityBillUrl: data.electricityBillUrl || "",
           electricityBillType: data.electricityBillType || "",
         });
@@ -144,21 +166,15 @@ export const AddHouse = () => {
     if (!formData.location.trim()) newErrors.location = "Location is required";
 
     const rent = parseFloat(formData.rent);
-    if (!formData.rent || isNaN(rent) || rent <= 0) {
-      newErrors.rent = "Valid rent amount is required";
-    }
+    if (!formData.rent || isNaN(rent) || rent <= 0) newErrors.rent = "Valid rent amount is required";
 
     const deposit = parseFloat(formData.deposit);
-    if (!formData.deposit || isNaN(deposit) || deposit <= 0) {
+    if (!formData.deposit || isNaN(deposit) || deposit <= 0)
       newErrors.deposit = "Valid deposit amount is required";
-    }
 
     const area = parseFloat(formData.area);
-    if (!formData.area || isNaN(area) || area <= 0) {
-      newErrors.area = "Valid area is required";
-    }
+    if (!formData.area || isNaN(area) || area <= 0) newErrors.area = "Valid area is required";
 
-    // ✅ Booking amount is optional but must be >= 0 if provided
     if (formData.bookingAmount !== "") {
       const bookingAmount = parseFloat(formData.bookingAmount);
       if (isNaN(bookingAmount) || bookingAmount < 0) {
@@ -166,7 +182,6 @@ export const AddHouse = () => {
       }
     }
 
-    // ✅ NEW: Electricity bill required
     if (!formData.electricityBillUrl) {
       newErrors.electricityBillUrl = "Electricity bill is required (PDF/JPG/PNG)";
     }
@@ -192,32 +207,22 @@ export const AddHouse = () => {
 
   const addImage = () => {
     if (imageUrl.trim()) {
-      setFormData((prev) => ({
-        ...prev,
-        images: [...prev.images, imageUrl.trim()],
-      }));
+      setFormData((prev) => ({ ...prev, images: [...prev.images, imageUrl.trim()] }));
       setImageUrl("");
     }
   };
 
   const removeImage = (index) => {
-    setFormData((prev) => ({
-      ...prev,
-      images: prev.images.filter((_, i) => i !== index),
-    }));
+    setFormData((prev) => ({ ...prev, images: prev.images.filter((_, i) => i !== index) }));
   };
 
   const addSampleImage = () => {
     const randomImage = SAMPLE_IMAGES[Math.floor(Math.random() * SAMPLE_IMAGES.length)];
     if (!formData.images.includes(randomImage)) {
-      setFormData((prev) => ({
-        ...prev,
-        images: [...prev.images, randomImage],
-      }));
+      setFormData((prev) => ({ ...prev, images: [...prev.images, randomImage] }));
     }
   };
 
-  // Upload device image -> backend -> Cloudinary -> returns secure_url
   const handleDeviceUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -250,11 +255,7 @@ export const AddHouse = () => {
       if (!res.ok) throw new Error(data?.message || "Upload failed");
       if (!data?.url) throw new Error("Upload failed: no URL returned");
 
-      setFormData((prev) => ({
-        ...prev,
-        images: [...prev.images, data.url],
-      }));
-
+      setFormData((prev) => ({ ...prev, images: [...prev.images, data.url] }));
       showToast("Image uploaded", "success");
     } catch (err) {
       showToast(err.message || "Upload failed", "error");
@@ -264,19 +265,11 @@ export const AddHouse = () => {
     }
   };
 
-  // ✅ NEW: Upload electricity bill (PDF/JPG/PNG/WEBP)
   const handleBillUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const allowed = [
-      "image/jpeg",
-      "image/png",
-      "image/webp",
-      "image/jpg",
-      "application/pdf",
-    ];
-
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/jpg", "application/pdf"];
     if (!allowed.includes(file.type)) {
       showToast("Only PDF, JPG, PNG, WEBP allowed", "error");
       e.target.value = "";
@@ -310,7 +303,6 @@ export const AddHouse = () => {
         electricityBillType: data.mimeType || file.type || "",
       }));
 
-      // clear error if any
       if (errors.electricityBillUrl) {
         setErrors((prev) => ({ ...prev, electricityBillUrl: undefined }));
       }
@@ -325,14 +317,9 @@ export const AddHouse = () => {
   };
 
   const removeBill = () => {
-    setFormData((prev) => ({
-      ...prev,
-      electricityBillUrl: "",
-      electricityBillType: "",
-    }));
+    setFormData((prev) => ({ ...prev, electricityBillUrl: "", electricityBillType: "" }));
   };
 
-  // Create / Update house
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -362,8 +349,6 @@ export const AddHouse = () => {
             ? formData.images
             : [SAMPLE_IMAGES[Math.floor(Math.random() * SAMPLE_IMAGES.length)]],
         availability: formData.availability,
-
-        // ✅ NEW: send electricity bill to backend
         electricityBillUrl: formData.electricityBillUrl,
         electricityBillType: formData.electricityBillType,
       };
@@ -396,8 +381,11 @@ export const AddHouse = () => {
 
   if (pageLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 flex items-center justify-center">
+        <div className="flex items-center gap-3 text-indigo-700">
+          <Loader2 className="w-7 h-7 animate-spin" />
+          <span className="font-semibold">Loading property…</span>
+        </div>
       </div>
     );
   }
@@ -405,418 +393,405 @@ export const AddHouse = () => {
   const billIsPdf = String(formData.electricityBillType || "").toLowerCase().includes("pdf");
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 py-10">
+      {/* soft blobs */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute -top-24 -right-24 w-80 h-80 bg-indigo-200/40 blur-3xl rounded-full" />
+        <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-violet-200/40 blur-3xl rounded-full" />
+      </div>
+
+      <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Back button */}
         <button
           onClick={() => navigate("/landlord/dashboard")}
-          className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition"
+          className="inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 bg-white/80 backdrop-blur border border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-white transition shadow-sm"
         >
-          <ArrowLeft className="w-5 h-5" />
-          Back to Dashboard
+          <ArrowLeft className="w-4 h-4" />
+          <span className="font-semibold">Back to Dashboard</span>
         </button>
 
-        <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8">
-          <h1 className="text-2xl font-bold text-gray-900 mb-6">
+        {/* Header */}
+        <div className="mt-6 mb-6">
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
             {isEdit ? "Edit Property" : "Add New Property"}
           </h1>
+          <p className="mt-1 text-slate-600">
+            Fill the details below. Your property may require admin approval.
+          </p>
+        </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Title */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Property Title *</label>
-              <input
-                type="text"
-                name="title"
-                value={formData.title}
-                onChange={handleChange}
-                className={`w-full px-4 py-3 rounded-lg border ${
-                  errors.title ? "border-red-500" : "border-gray-300"
-                } focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition`}
-                placeholder="e.g., Modern 2BHK Apartment near Metro"
-              />
-              {errors.title && <p className="mt-1 text-sm text-red-500">{errors.title}</p>}
-            </div>
+        {/* Main card */}
+        <div className="rounded-3xl border border-slate-200 bg-white/70 backdrop-blur shadow-xl shadow-indigo-100/40 p-4 sm:p-6">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <Section title="Property Basics" subtitle="Tell tenants what you’re listing.">
+              <div className="space-y-5">
+                <Field label="Property Title" required error={errors.title}>
+                  <input
+                    type="text"
+                    name="title"
+                    value={formData.title}
+                    onChange={handleChange}
+                    className={`w-full px-4 py-3 rounded-2xl border ${
+                      errors.title ? "border-rose-300" : "border-slate-200"
+                    } bg-white focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300 outline-none transition`}
+                    placeholder="e.g., Modern 2BHK Apartment near Metro"
+                  />
+                </Field>
 
-            {/* Description */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Description *</label>
-              <textarea
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                rows={4}
-                className={`w-full px-4 py-3 rounded-lg border ${
-                  errors.description ? "border-red-500" : "border-gray-300"
-                } focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition`}
-                placeholder="Describe the property, its features, and surroundings..."
-              />
-              {errors.description && (
-                <p className="mt-1 text-sm text-red-500">{errors.description}</p>
-              )}
-            </div>
+                <Field label="Description" required error={errors.description}>
+                  <textarea
+                    name="description"
+                    value={formData.description}
+                    onChange={handleChange}
+                    rows={4}
+                    className={`w-full px-4 py-3 rounded-2xl border ${
+                      errors.description ? "border-rose-300" : "border-slate-200"
+                    } bg-white focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300 outline-none transition`}
+                    placeholder="Describe the property, its features, and surroundings..."
+                  />
+                </Field>
 
-            {/* Location */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Location / Address *</label>
-              <input
-                type="text"
-                name="location"
-                value={formData.location}
-                onChange={handleChange}
-                className={`w-full px-4 py-3 rounded-lg border ${
-                  errors.location ? "border-red-500" : "border-gray-300"
-                } focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition`}
-                placeholder="e.g., Agartala, Tripura"
-              />
-              {errors.location && <p className="mt-1 text-sm text-red-500">{errors.location}</p>}
-            </div>
+                <Field label="Location / Address" required error={errors.location}>
+                  <input
+                    type="text"
+                    name="location"
+                    value={formData.location}
+                    onChange={handleChange}
+                    className={`w-full px-4 py-3 rounded-2xl border ${
+                      errors.location ? "border-rose-300" : "border-slate-200"
+                    } bg-white focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300 outline-none transition`}
+                    placeholder="e.g., Agartala, Tripura"
+                  />
+                </Field>
 
-            {/* Property Type */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Property Type</label>
-              <div className="grid grid-cols-3 gap-3">
-                {HOUSE_TYPES.map((type) => (
-                  <button
-                    key={type.value}
-                    type="button"
-                    onClick={() => setFormData((prev) => ({ ...prev, type: type.value }))}
-                    className={`p-4 rounded-xl border-2 transition-all ${
-                      formData.type === type.value
-                        ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                        : "border-gray-200 hover:border-gray-300"
-                    }`}
-                  >
-                    <div className="text-2xl mb-1">{type.icon}</div>
-                    <div className="font-medium">{type.label}</div>
-                  </button>
-                ))}
+                <Field label="Property Type">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {HOUSE_TYPES.map((type) => (
+                      <button
+                        key={type.value}
+                        type="button"
+                        onClick={() => setFormData((prev) => ({ ...prev, type: type.value }))}
+                        className={`p-4 rounded-2xl border transition-all text-left ${
+                          formData.type === type.value
+                            ? "border-indigo-300 bg-indigo-50 text-indigo-800 ring-1 ring-indigo-200"
+                            : "border-slate-200 bg-white hover:bg-slate-50"
+                        }`}
+                      >
+                        <div className="text-2xl">{type.icon}</div>
+                        <div className="mt-1 font-semibold">{type.label}</div>
+                        <div className="text-xs text-slate-500">Choose type</div>
+                      </button>
+                    ))}
+                  </div>
+                </Field>
               </div>
-            </div>
+            </Section>
 
-            {/* Rent, Deposit, Booking Amount */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Rent per Month (₹) *</label>
-                <input
-                  type="number"
-                  name="rent"
-                  value={formData.rent}
-                  onChange={handleChange}
-                  min="0"
-                  className={`w-full px-4 py-3 rounded-lg border ${
-                    errors.rent ? "border-red-500" : "border-gray-300"
-                  } focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition`}
-                  placeholder="10000"
-                />
-                {errors.rent && <p className="mt-1 text-sm text-red-500">{errors.rent}</p>}
-              </div>
+            <Section title="Pricing" subtitle="Set rent, deposit, and optional booking fee.">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Field label="Rent per Month (₹)" required error={errors.rent}>
+                  <input
+                    type="number"
+                    name="rent"
+                    value={formData.rent}
+                    onChange={handleChange}
+                    min="0"
+                    className={`w-full px-4 py-3 rounded-2xl border ${
+                      errors.rent ? "border-rose-300" : "border-slate-200"
+                    } bg-white focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300 outline-none transition`}
+                    placeholder="10000"
+                  />
+                </Field>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Security Deposit (₹) *</label>
-                <input
-                  type="number"
-                  name="deposit"
-                  value={formData.deposit}
-                  onChange={handleChange}
-                  min="0"
-                  className={`w-full px-4 py-3 rounded-lg border ${
-                    errors.deposit ? "border-red-500" : "border-gray-300"
-                  } focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition`}
-                  placeholder="20000"
-                />
-                {errors.deposit && <p className="mt-1 text-sm text-red-500">{errors.deposit}</p>}
-              </div>
+                <Field label="Security Deposit (₹)" required error={errors.deposit}>
+                  <input
+                    type="number"
+                    name="deposit"
+                    value={formData.deposit}
+                    onChange={handleChange}
+                    min="0"
+                    className={`w-full px-4 py-3 rounded-2xl border ${
+                      errors.deposit ? "border-rose-300" : "border-slate-200"
+                    } bg-white focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300 outline-none transition`}
+                    placeholder="20000"
+                  />
+                </Field>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Booking Amount (₹)</label>
-                <input
-                  type="number"
-                  name="bookingAmount"
-                  value={formData.bookingAmount}
-                  onChange={handleChange}
-                  min="0"
-                  className={`w-full px-4 py-3 rounded-lg border ${
-                    errors.bookingAmount ? "border-red-500" : "border-gray-300"
-                  } focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition`}
-                  placeholder="500"
-                />
-                {errors.bookingAmount && (
-                  <p className="mt-1 text-sm text-red-500">{errors.bookingAmount}</p>
-                )}
-                <p className="mt-1 text-xs text-gray-500">
-                  Tenant will pay this amount using UPI to book (optional).
-                </p>
-              </div>
-            </div>
-
-            {/* Beds, Baths, Area */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Bedrooms</label>
-                <select
-                  name="beds"
-                  value={formData.beds}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                <Field
+                  label="Booking Amount (₹)"
+                  error={errors.bookingAmount}
+                  hint="Optional"
                 >
-                  {[1, 2, 3, 4, 5, 6].map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </select>
+                  <input
+                    type="number"
+                    name="bookingAmount"
+                    value={formData.bookingAmount}
+                    onChange={handleChange}
+                    min="0"
+                    className={`w-full px-4 py-3 rounded-2xl border ${
+                      errors.bookingAmount ? "border-rose-300" : "border-slate-200"
+                    } bg-white focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300 outline-none transition`}
+                    placeholder="500"
+                  />
+                  <p className="mt-1 text-xs text-slate-500">
+                    Tenant pays this via UPI to book (optional).
+                  </p>
+                </Field>
               </div>
+            </Section>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Bathrooms</label>
-                <select
-                  name="baths"
-                  value={formData.baths}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
-                >
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Area (sqft) *</label>
-                <input
-                  type="number"
-                  name="area"
-                  value={formData.area}
-                  onChange={handleChange}
-                  min="0"
-                  className={`w-full px-4 py-3 rounded-lg border ${
-                    errors.area ? "border-red-500" : "border-gray-300"
-                  } focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition`}
-                  placeholder="1200"
-                />
-                {errors.area && <p className="mt-1 text-sm text-red-500">{errors.area}</p>}
-              </div>
-            </div>
-
-            {/* Furnished */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Furnished Status</label>
-              <div className="grid grid-cols-3 gap-3">
-                {FURNISHED_OPTIONS.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setFormData((prev) => ({ ...prev, furnished: option.value }))}
-                    className={`p-3 rounded-xl border-2 transition-all ${
-                      formData.furnished === option.value
-                        ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                        : "border-gray-200 hover:border-gray-300"
-                    }`}
+            <Section title="Details" subtitle="Bedrooms, bathrooms, area, furnishing, availability.">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Field label="Bedrooms">
+                  <select
+                    name="beds"
+                    value={formData.beds}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-white focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300 outline-none transition"
                   >
-                    <div className="font-medium text-sm">{option.label}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
+                    {[1, 2, 3, 4, 5, 6].map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
 
-            {/* Amenities */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Amenities</label>
+                <Field label="Bathrooms">
+                  <select
+                    name="baths"
+                    value={formData.baths}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-white focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300 outline-none transition"
+                  >
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Area (sqft)" required error={errors.area}>
+                  <input
+                    type="number"
+                    name="area"
+                    value={formData.area}
+                    onChange={handleChange}
+                    min="0"
+                    className={`w-full px-4 py-3 rounded-2xl border ${
+                      errors.area ? "border-rose-300" : "border-slate-200"
+                    } bg-white focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300 outline-none transition`}
+                    placeholder="1200"
+                  />
+                </Field>
+              </div>
+
+              <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Field label="Furnished Status">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {FURNISHED_OPTIONS.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setFormData((prev) => ({ ...prev, furnished: option.value }))}
+                        className={`p-3 rounded-2xl border transition-all text-left ${
+                          formData.furnished === option.value
+                            ? "border-indigo-300 bg-indigo-50 text-indigo-800 ring-1 ring-indigo-200"
+                            : "border-slate-200 bg-white hover:bg-slate-50"
+                        }`}
+                      >
+                        <div className="font-semibold text-sm">{option.label}</div>
+                        <div className="text-xs text-slate-500">Select</div>
+                      </button>
+                    ))}
+                  </div>
+                </Field>
+
+                <Field label="Available From">
+                  <input
+                    type="date"
+                    name="availability"
+                    value={formData.availability}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-white focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300 outline-none transition"
+                  />
+                </Field>
+              </div>
+            </Section>
+
+            <Section title="Amenities" subtitle="Pick what’s available for tenants.">
               <div className="flex flex-wrap gap-2">
-                {AMENITIES_OPTIONS.map((amenity) => (
-                  <button
-                    key={amenity}
-                    type="button"
-                    onClick={() => toggleAmenity(amenity)}
-                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                      formData.amenities.includes(amenity)
-                        ? "bg-indigo-600 text-white"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    }`}
-                  >
-                    {amenity}
-                  </button>
-                ))}
+                {AMENITIES_OPTIONS.map((amenity) => {
+                  const active = formData.amenities.includes(amenity);
+                  return (
+                    <button
+                      key={amenity}
+                      type="button"
+                      onClick={() => toggleAmenity(amenity)}
+                      className={`px-4 py-2 rounded-full text-sm font-semibold transition-all ring-1 ring-inset ${
+                        active
+                          ? "bg-indigo-600 text-white ring-indigo-600"
+                          : "bg-white text-slate-700 ring-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      {amenity}
+                    </button>
+                  );
+                })}
               </div>
-            </div>
+            </Section>
 
-            {/* Images */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Property Images</label>
+            <Section title="Uploads" subtitle="Add photos and upload electricity bill for verification.">
+              {/* Images */}
+              <Field label="Property Images" hint="Optional (recommended)">
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="url"
+                    value={imageUrl}
+                    onChange={(e) => setImageUrl(e.target.value)}
+                    className="flex-1 px-4 py-2.5 rounded-2xl border border-slate-200 bg-white focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300 outline-none"
+                    placeholder="Paste image URL…"
+                  />
 
-              <div className="flex flex-col sm:flex-row gap-2 mb-3">
-                <input
-                  type="url"
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  className="flex-1 px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  placeholder="Paste image URL..."
-                />
+                  <div className="flex gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={addImage}
+                      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-900 text-white font-semibold hover:bg-slate-800 transition"
+                      title="Add image URL"
+                    >
+                      <Upload className="w-4 h-4" />
+                      Add
+                    </button>
 
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={addImage}
-                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
-                    title="Add image URL"
-                  >
-                    <Upload className="w-5 h-5" />
-                  </button>
+                    <label
+                      className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl border font-semibold transition cursor-pointer ${
+                        uploading
+                          ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
+                          : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                      }`}
+                      title="Upload from device"
+                    >
+                      {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
+                      {uploading ? "Uploading…" : "Device"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleDeviceUpload}
+                        disabled={uploading}
+                        className="hidden"
+                      />
+                    </label>
 
+                    <button
+                      type="button"
+                      onClick={addSampleImage}
+                      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-indigo-50 text-indigo-700 font-semibold hover:bg-indigo-100 transition border border-indigo-200"
+                    >
+                      ✨ Sample
+                    </button>
+                  </div>
+                </div>
+
+                {formData.images.length > 0 && (
+                  <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {formData.images.map((img, index) => (
+                      <div key={index} className="relative group overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                        <img src={img} alt={`Property ${index + 1}`} className="w-full h-24 object-cover" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition" />
+                        <button
+                          type="button"
+                          onClick={() => removeImage(index)}
+                          className="absolute top-2 right-2 p-2 bg-white/90 text-slate-800 rounded-xl opacity-0 group-hover:opacity-100 transition shadow"
+                          title="Remove image"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Field>
+
+              {/* Bill */}
+              <Field
+                label="Electricity Bill (PDF/JPG/PNG)"
+                required
+                error={errors.electricityBillUrl}
+                hint="Required"
+              >
+                <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
                   <label
-                    className={`px-4 py-2 rounded-lg transition text-sm cursor-pointer flex items-center gap-2 ${
-                      uploading
-                        ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    className={`inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl border font-semibold transition cursor-pointer ${
+                      billUploading
+                        ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
+                        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
                     }`}
-                    title="Upload from device"
+                    title="Upload electricity bill"
                   >
-                    {uploading ? (
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                    ) : (
-                      <ImageIcon className="w-5 h-5" />
-                    )}
-                    <span className="hidden sm:inline">{uploading ? "Uploading..." : "Device"}</span>
-
+                    {billUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+                    {billUploading ? "Uploading…" : "Upload Bill"}
                     <input
                       type="file"
-                      accept="image/*"
-                      onChange={handleDeviceUpload}
-                      disabled={uploading}
+                      accept="application/pdf,image/*"
+                      onChange={handleBillUpload}
+                      disabled={billUploading}
                       className="hidden"
                     />
                   </label>
 
-                  <button
-                    type="button"
-                    onClick={addSampleImage}
-                    className="px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition text-sm"
-                  >
-                    Add Sample
-                  </button>
-                </div>
-              </div>
+                  {formData.electricityBillUrl ? (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <a
+                        href={formData.electricityBillUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl border border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition font-semibold"
+                        title="View bill"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        {billIsPdf ? "View PDF" : "View Image"}
+                      </a>
 
-              {formData.images.length > 0 && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {formData.images.map((img, index) => (
-                    <div key={index} className="relative group">
-                      <img
-                        src={img}
-                        alt={`Property ${index + 1}`}
-                        className="w-full h-24 object-cover rounded-lg"
-                      />
                       <button
                         type="button"
-                        onClick={() => removeImage(index)}
-                        className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition"
+                        onClick={removeBill}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl border border-rose-200 text-rose-700 bg-rose-50 hover:bg-rose-100 transition font-semibold"
+                        title="Remove bill"
                       >
                         <X className="w-4 h-4" />
+                        Remove
                       </button>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* ✅ NEW: Electricity Bill Upload */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Electricity Bill (PDF/JPG/PNG) *
-              </label>
-
-              <div className="flex flex-col sm:flex-row gap-2">
-                <label
-                  className={`px-4 py-2 rounded-lg transition text-sm cursor-pointer flex items-center gap-2 border ${
-                    billUploading
-                      ? "bg-gray-200 text-gray-500 cursor-not-allowed border-gray-200"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-300"
-                  }`}
-                  title="Upload electricity bill"
-                >
-                  {billUploading ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
                   ) : (
-                    <FileText className="w-5 h-5" />
+                    <p className="text-sm text-slate-600">
+                      Upload a recent bill for verification.
+                    </p>
                   )}
-                  <span>{billUploading ? "Uploading..." : "Upload Bill"}</span>
+                </div>
+              </Field>
+            </Section>
 
-                  <input
-                    type="file"
-                    accept="application/pdf,image/*"
-                    onChange={handleBillUpload}
-                    disabled={billUploading}
-                    className="hidden"
-                  />
-                </label>
-
-                {formData.electricityBillUrl ? (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <a
-                      href={formData.electricityBillUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition text-sm"
-                      title="View bill"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                      {billIsPdf ? "View PDF" : "View Image"}
-                    </a>
-
-                    <button
-                      type="button"
-                      onClick={removeBill}
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition text-sm"
-                      title="Remove bill"
-                    >
-                      <X className="w-4 h-4" />
-                      Remove
-                    </button>
-                  </div>
-                ) : (
-                  <p className="text-xs text-gray-500 flex items-center">
-                    Please upload a recent electricity bill for verification.
-                  </p>
-                )}
-              </div>
-
-              {errors.electricityBillUrl && (
-                <p className="mt-1 text-sm text-red-500">{errors.electricityBillUrl}</p>
-              )}
-            </div>
-
-            {/* Availability */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Available From</label>
-              <input
-                type="date"
-                name="availability"
-                value={formData.availability}
-                onChange={handleChange}
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
-              />
-            </div>
-
-            {/* Buttons */}
-            <div className="flex gap-4 pt-4">
+            {/* Footer actions */}
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
               <button
                 type="button"
                 onClick={() => navigate("/landlord/dashboard")}
-                className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition"
+                className="flex-1 py-3 rounded-2xl border border-slate-200 bg-white text-slate-800 font-semibold hover:bg-slate-50 transition"
               >
                 Cancel
               </button>
+
               <button
                 type="submit"
                 disabled={loading || uploading || billUploading}
-                className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 py-3 rounded-2xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition disabled:opacity-60 inline-flex items-center justify-center gap-2 shadow-lg shadow-indigo-200"
               >
                 {loading ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    Saving...
+                    Saving…
                   </>
                 ) : isEdit ? (
                   "Update Property"
@@ -827,10 +802,10 @@ export const AddHouse = () => {
             </div>
 
             {!isEdit && (
-              <p className="text-xs text-gray-500">
-                After submission, your property will be <span className="font-medium">pending</span> until admin approves
-                the electricity bill.
-              </p>
+              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
+                After submission, your property will be{" "}
+                <span className="font-semibold text-slate-900">pending</span> until admin approves the electricity bill.
+              </div>
             )}
           </form>
         </div>
