@@ -11,6 +11,8 @@ import {
   MapPin,
   Calendar,
   Phone,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 // Small helper: 6-digit OTP only
@@ -50,6 +52,10 @@ export const Register = () => {
   const [otpLoading, setOtpLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
   const [cooldown, setCooldown] = useState(0); // seconds
+
+  // ✅ show/hide password
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const emailLower = useMemo(
     () => (formData.email || "").trim().toLowerCase(),
@@ -93,9 +99,7 @@ export const Register = () => {
 
     // ✅ Legal check
     if (!acceptedLegal) {
-      setLegalError(
-        "You must accept the Terms & Conditions and Privacy Policy to continue"
-      );
+      setLegalError("You must accept the Terms & Conditions and Privacy Policy to continue");
     } else {
       setLegalError("");
     }
@@ -228,26 +232,35 @@ export const Register = () => {
   // ===========================
   if (step === "otp") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 py-12 px-4">
-        <div className="max-w-md mx-auto">
+      <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-fuchsia-50 py-12 px-4">
+        {/* subtle background blobs */}
+        <div className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-indigo-200/40 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 -right-24 h-80 w-80 rounded-full bg-fuchsia-200/30 blur-3xl" />
+        <div className="pointer-events-none absolute top-1/3 -right-24 h-72 w-72 rounded-full bg-violet-200/25 blur-3xl" />
+
+        <div className="max-w-md mx-auto relative">
           <div className="text-center mb-8">
             <Link
               to="/"
-              className="inline-flex items-center gap-2 text-2xl font-bold text-indigo-600"
+              className="inline-flex items-center gap-2 text-2xl font-extrabold text-indigo-600"
             >
               <Building2 className="w-10 h-10" />
               <span>HomeRent</span>
             </Link>
-            <h1 className="mt-6 text-3xl font-bold text-gray-900">
-              Verify your email
+
+            <h1 className="mt-6 text-3xl font-extrabold tracking-tight text-gray-900">
+              <span className="bg-gradient-to-r from-indigo-700 via-violet-700 to-fuchsia-700 bg-clip-text text-transparent">
+                Verify your email
+              </span>
             </h1>
+
             <p className="mt-2 text-gray-600">
               We sent a 6-digit OTP to{" "}
-              <span className="font-medium text-gray-900">{emailLower}</span>
+              <span className="font-semibold text-gray-900 break-all">{emailLower}</span>
             </p>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-xl p-8">
+          <div className="bg-white/80 backdrop-blur rounded-2xl shadow-xl border border-gray-100 p-8">
             <form onSubmit={handleVerifyOtp} className="space-y-5">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -261,15 +274,13 @@ export const Register = () => {
                   className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition text-center tracking-[0.6em] font-semibold"
                   placeholder="••••••"
                 />
-                <p className="mt-2 text-xs text-gray-500">
-                  OTP expires in 10 minutes.
-                </p>
+                <p className="mt-2 text-xs text-gray-500">OTP expires in 10 minutes.</p>
               </div>
 
               <button
                 type="submit"
                 disabled={otpLoading}
-                className="w-full py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full py-3 rounded-lg font-medium text-white bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 hover:brightness-105 transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-indigo-200/60"
               >
                 {otpLoading ? (
                   <>
@@ -324,23 +335,32 @@ export const Register = () => {
   // UI: FORM STEP
   // ===========================
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 py-12 px-4">
-      <div className="max-w-md mx-auto">
+    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-fuchsia-50 py-12 px-4">
+      {/* subtle background blobs */}
+      <div className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-indigo-200/40 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-24 -right-24 h-80 w-80 rounded-full bg-fuchsia-200/30 blur-3xl" />
+      <div className="pointer-events-none absolute top-1/3 -right-24 h-72 w-72 rounded-full bg-violet-200/25 blur-3xl" />
+
+      <div className="max-w-md mx-auto relative">
         <div className="text-center mb-8">
           <Link
             to="/"
-            className="inline-flex items-center gap-2 text-2xl font-bold text-indigo-600"
+            className="inline-flex items-center gap-2 text-2xl font-extrabold text-indigo-600"
           >
             <Building2 className="w-10 h-10" />
             <span>HomeRent</span>
           </Link>
-          <h1 className="mt-6 text-3xl font-bold text-gray-900">
-            Create your account
+
+          <h1 className="mt-6 text-3xl font-extrabold tracking-tight text-gray-900">
+            <span className="bg-gradient-to-r from-indigo-700 via-violet-700 to-fuchsia-700 bg-clip-text text-transparent">
+              Create your account
+            </span>
           </h1>
+
           <p className="mt-2 text-gray-600">Join us to find or list rentals</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl p-8">
+        <div className="bg-white/80 backdrop-blur rounded-2xl shadow-xl border border-gray-100 p-8">
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Role Selection */}
             <div>
@@ -366,9 +386,7 @@ export const Register = () => {
 
                 <button
                   type="button"
-                  onClick={() =>
-                    setFormData((prev) => ({ ...prev, role: "landlord" }))
-                  }
+                  onClick={() => setFormData((prev) => ({ ...prev, role: "landlord" }))}
                   className={`p-4 rounded-xl border-2 transition-all ${
                     formData.role === "landlord"
                       ? "border-indigo-500 bg-indigo-50 text-indigo-700"
@@ -396,13 +414,12 @@ export const Register = () => {
                   onChange={handleChange}
                   className={`w-full px-4 py-3 rounded-lg border ${
                     errors.aadhaarNumber ? "border-red-500" : "border-gray-300"
-                  } focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition`}
+                  } focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition bg-white`}
                   placeholder="12-digit Aadhaar"
                 />
                 {errors.aadhaarNumber && (
                   <p className="mt-1 text-sm text-red-500">{errors.aadhaarNumber}</p>
                 )}
-                
               </div>
             )}
 
@@ -420,13 +437,11 @@ export const Register = () => {
                   onChange={handleChange}
                   className={`w-full pl-10 pr-4 py-3 rounded-lg border ${
                     errors.name ? "border-red-500" : "border-gray-300"
-                  } focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition`}
+                  } focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition bg-white`}
                   placeholder="John Doe"
                 />
               </div>
-              {errors.name && (
-                <p className="mt-1 text-sm text-red-500">{errors.name}</p>
-              )}
+              {errors.name && <p className="mt-1 text-sm text-red-500">{errors.name}</p>}
             </div>
 
             {/* Age & Phone */}
@@ -445,13 +460,11 @@ export const Register = () => {
                     min="18"
                     className={`w-full pl-10 pr-4 py-3 rounded-lg border ${
                       errors.age ? "border-red-500" : "border-gray-300"
-                    } focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition`}
+                    } focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition bg-white`}
                     placeholder="25"
                   />
                 </div>
-                {errors.age && (
-                  <p className="mt-1 text-sm text-red-500">{errors.age}</p>
-                )}
+                {errors.age && <p className="mt-1 text-sm text-red-500">{errors.age}</p>}
               </div>
 
               <div>
@@ -465,7 +478,7 @@ export const Register = () => {
                     name="phone"
                     value={formData.phone}
                     onChange={handleChange}
-                    className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                    className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition bg-white"
                     placeholder="+91 98765 43210"
                   />
                 </div>
@@ -486,7 +499,7 @@ export const Register = () => {
                   onChange={handleChange}
                   className={`w-full pl-10 pr-4 py-3 rounded-lg border ${
                     errors.address ? "border-red-500" : "border-gray-300"
-                  } focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition`}
+                  } focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition bg-white`}
                   placeholder="123 Main St, City, State"
                 />
               </div>
@@ -509,13 +522,11 @@ export const Register = () => {
                   onChange={handleChange}
                   className={`w-full pl-10 pr-4 py-3 rounded-lg border ${
                     errors.email ? "border-red-500" : "border-gray-300"
-                  } focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition`}
+                  } focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition bg-white`}
                   placeholder="john@example.com"
                 />
               </div>
-              {errors.email && (
-                <p className="mt-1 text-sm text-red-500">{errors.email}</p>
-              )}
+              {errors.email && <p className="mt-1 text-sm text-red-500">{errors.email}</p>}
             </div>
 
             {/* Password */}
@@ -526,15 +537,23 @@ export const Register = () => {
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
-                  className={`w-full pl-10 pr-4 py-3 rounded-lg border ${
+                  className={`w-full pl-10 pr-11 py-3 rounded-lg border ${
                     errors.password ? "border-red-500" : "border-gray-300"
-                  } focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition`}
+                  } focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition bg-white`}
                   placeholder="••••••••"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((s) => !s)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
               </div>
               {errors.password && (
                 <p className="mt-1 text-sm text-red-500">{errors.password}</p>
@@ -549,20 +568,30 @@ export const Register = () => {
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
-                  type="password"
+                  type={showConfirmPassword ? "text" : "password"}
                   name="confirmPassword"
                   value={formData.confirmPassword}
                   onChange={handleChange}
-                  className={`w-full pl-10 pr-4 py-3 rounded-lg border ${
+                  className={`w-full pl-10 pr-11 py-3 rounded-lg border ${
                     errors.confirmPassword ? "border-red-500" : "border-gray-300"
-                  } focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition`}
+                  } focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition bg-white`}
                   placeholder="••••••••"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((s) => !s)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                  aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff className="w-5 h-5" />
+                  ) : (
+                    <Eye className="w-5 h-5" />
+                  )}
+                </button>
               </div>
               {errors.confirmPassword && (
-                <p className="mt-1 text-sm text-red-500">
-                  {errors.confirmPassword}
-                </p>
+                <p className="mt-1 text-sm text-red-500">{errors.confirmPassword}</p>
               )}
             </div>
 
@@ -605,7 +634,7 @@ export const Register = () => {
             <button
               type="submit"
               disabled={loading || !acceptedLegal}
-              className="w-full py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full py-3 rounded-lg font-medium text-white bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 hover:brightness-105 transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-indigo-200/60"
             >
               {loading ? (
                 <>
@@ -620,10 +649,7 @@ export const Register = () => {
 
           <p className="mt-6 text-center text-gray-600">
             Already have an account?{" "}
-            <Link
-              to="/login"
-              className="text-indigo-600 font-medium hover:text-indigo-700"
-            >
+            <Link to="/login" className="text-indigo-600 font-medium hover:text-indigo-700">
               Sign in
             </Link>
           </p>
