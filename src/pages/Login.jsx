@@ -11,6 +11,8 @@ import {
   BadgeCheck,
   Sparkles,
   ArrowRight,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 export const Login = () => {
@@ -22,6 +24,7 @@ export const Login = () => {
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const emailLower = useMemo(() => String(email || "").trim().toLowerCase(), [email]);
 
@@ -173,18 +176,31 @@ export const Login = () => {
                       </div>
 
                       <input
-                        type="password"
+                        type={showPassword ? "text" : "password"}
                         value={password}
                         onChange={(e) => {
                           setPassword(e.target.value);
                           if (errors.password) setErrors((prev) => ({ ...prev, password: undefined }));
                         }}
-                        className={`w-full pl-14 pr-4 py-3 rounded-2xl border bg-white outline-none transition
+                        className={`w-full pl-14 pr-12 py-3 rounded-2xl border bg-white outline-none transition
                           ${errors.password ? "border-rose-400" : "border-slate-200"}
                           focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300`}
                         placeholder="••••••••"
                         autoComplete="current-password"
                       />
+
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((prev) => !prev)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-700 hover:bg-indigo-100 transition"
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="w-4 h-4" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
+                      </button>
                     </div>
 
                     <div className="mt-2 flex items-center justify-between">
